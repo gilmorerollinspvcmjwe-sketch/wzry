@@ -5,9 +5,12 @@ import Home from '@/views/home/index.vue';
 import Team from '@/views/team/index.vue';
 import Match from '@/views/match/index.vue';
 import Transfer from '@/views/transfer/index.vue';
+import MorePage from '@/views/MorePage.vue';
 import Settings from '@/views/settings/index.vue';
 import League from '@/views/league/index.vue';
 import BattleReport from '@/views/battle-report/index.vue';
+import Sponsor from '@/views/sponsor/index.vue';
+import Fans from '@/views/fans/index.vue';
 import NotFound from '@/views/NotFound.vue';
 import { useClubStore } from '@/stores/club';
 
@@ -25,8 +28,11 @@ const routes = [
       { path: 'team', name: 'Team', component: Team },
       { path: 'match', name: 'Match', component: Match },
       { path: 'transfer', name: 'Transfer', component: Transfer },
+      { path: 'more', name: 'More', component: MorePage },
       { path: 'league', name: 'League', component: League },
       { path: 'battle-report', name: 'BattleReport', component: BattleReport },
+      { path: 'sponsor', name: 'Sponsor', component: Sponsor },
+      { path: 'fans', name: 'Fans', component: Fans },
       { path: 'settings', name: 'Settings', component: Settings },
     ],
     meta: { requiresGame: true }, // 需要游戏初始化

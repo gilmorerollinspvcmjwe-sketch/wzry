@@ -10,14 +10,12 @@ const clubStore = useClubStore();
 const gameStore = useGameStore();
 const playerStore = usePlayerStore();
 
-// 导航项（使用相对路径，因为在 /game 嵌套路由内）
+// 导航项（简化为4个）
 const navItems = [
   { path: '', icon: '🏠', label: '首页', name: 'Home' },
   { path: 'team', icon: '👥', label: '阵容', name: 'Team' },
   { path: 'match', icon: '🏆', label: '比赛', name: 'Match' },
-  { path: 'transfer', icon: '🔄', label: '转会', name: 'Transfer' },
-  { path: 'league', icon: '🏅', label: '联赛', name: 'League' },
-  { path: 'settings', icon: '⚙️', label: '设置', name: 'Settings' },
+  { path: 'more', icon: '⋮⋮', label: '更多', name: 'More' },
 ];
 
 // 当前俱乐部

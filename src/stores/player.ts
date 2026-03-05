@@ -83,6 +83,19 @@ export const usePlayerStore = defineStore('player', {
       this.transferList = this.transferList.filter(p => p.id !== playerId);
       this.youthPlayers = this.youthPlayers.filter(p => p.id !== playerId);
     },
+
+    // 恢复选手状态
+    recoverPlayer(playerId: string) {
+      const player = this.allPlayers.find(p => p.id === playerId);
+      if (player) {
+        player.recover();
+      }
+    },
+
+    // 获取选手
+    getPlayer(playerId: string): Player | undefined {
+      return this.allPlayers.find(p => p.id === playerId);
+    },
   },
   
   persist: true,
