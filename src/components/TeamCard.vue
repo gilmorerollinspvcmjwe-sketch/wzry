@@ -20,7 +20,7 @@
             v-for="player in mainRoster"
             :key="player.id"
             class="player-item"
-            :class="{ warning: player.stamina < 30 }"
+            :class="{ warning: (player.condition?.stamina || 0) < 30 }"
             @click="viewPlayerDetail(player)"
           >
             <div class="player-avatar">{{ player.name[0] }}</div>
@@ -31,15 +31,15 @@
             <div class="player-stats">
               <div class="stat-row">
                 <span class="stat-label">实力</span>
-                <span class="stat-value">{{ player.overall }}</span>
+                <span class="stat-value">{{ (player as any).getTotalPower?.() || 0 }}</span>
               </div>
               <div class="stat-row">
                 <span class="stat-label">体力</span>
                 <div class="stamina-bar">
                   <div
                     class="stamina-fill"
-                    :class="{ low: player.stamina < 30 }"
-                    :style="{ width: player.stamina + '%' }"
+                    :class="{ low: (player.condition?.stamina || 0) < 30 }"
+                    :style="{ width: (player.condition?.stamina || 0) + '%' }"
                   ></div>
                 </div>
               </div>
@@ -145,7 +145,7 @@ const viewPlayerDetail = (player: any) => {
   console.log('查看选手:', player);
 };
 
-const viewTransferDetail = (player: any) => {
+const viewTransferDetail = (_player: any) => {
   router.push('/game/transfer');
 };
 

@@ -2,10 +2,9 @@ import { defineStore } from 'pinia';
 import type { GameState, Difficulty } from '@/types';
 import { useClubStore } from './club';
 import { usePlayerStore } from './player';
-import { useHeroStore } from './hero';
 import { useSponsorStore } from './sponsor';
 import { useFanReputationStore } from './fanReputation';
-import { useLeagueStore } from './league';
+import { useEventStore } from './event';
 
 interface GameSettings {
   difficulty: Difficulty;
@@ -92,12 +91,10 @@ export const useGameStore = defineStore('game', {
 
     // 初始化各系统
     initializeSystems() {
-      const heroStore = useHeroStore();
       const sponsorStore = useSponsorStore();
       const fanReputationStore = useFanReputationStore();
 
-      // 初始化英雄系统
-      heroStore.initialize();
+      // 初始化英雄系统 - 简化版无需初始化
 
       // 初始化赞助商系统
       sponsorStore.initialize();
@@ -108,21 +105,61 @@ export const useGameStore = defineStore('game', {
     
     // 推进时间
     advanceTime(days: number = 1) {
+      // 确保 currentDate 是 Date 对象（Pinia 持久化后会变成字符串）
+      const currentDateObj = this.currentDate instanceof Date 
+        ? this.currentDate 
+        : new Date(this.currentDate);
+      
       for (let i = 0; i < days; i++) {
-        this.currentDate = new Date(this.currentDate.setDate(this.currentDate.getDate() + 1));
+        currentDateObj.setDate(currentDateObj.getDate() + 1);
+        this.currentDate = new Date(currentDateObj);
         this.onDayPassed();
       }
     },
     
     // 每日事件
     onDayPassed() {
+      // 确保 currentDate 是 Date 对象
+      const currentDateObj = this.currentDate instanceof Date 
+        ? this.currentDate 
+        : new Date(this.currentDate);
+      
       // 检查随机事件
       this.checkRandomEvents();
       
       // 每周一更新
-      if (this.currentDate.getDay() === 1) {
+      if (currentDateObj.getDay() === 1) {
         this.onWeekPassed();
       }
+    },
+    
+    // 检查随机事件（集成事件系统）
+    checkRandomEvents() {
+      const eventStore = useEventStore();
+      const clubStore = useClubStore();
+      const club = clubStore.currentClub;
+      
+      if (!club) return;
+      
+      // 创建俱乐部状态对象用于事件触发
+      const clubState = {
+        funds: club.funds,
+        reputation: club.reputation,
+        fans: club.fans,
+        week: this.currentWeek,
+        ranking: 10, // TODO: 从联赛排名获取
+        winRate: 0.5, // TODO: 从比赛记录获取
+        seasonPhase: 'regular' as const,
+        playerCount: club.roster.length,
+        hasPlayer: (_playerType: string) => {
+          // TODO: 实现选手类型检查
+          return false;
+        },
+      };
+      
+      // 触发每日事件
+      const currentDay = Math.floor((this.currentDate.getTime() - new Date(2024, 0, 1).getTime()) / (1000 * 60 * 60 * 24));
+      eventStore.triggerDailyEvent(currentDay, clubState);
     },
     
     // 每周事件
@@ -131,20 +168,16 @@ export const useGameStore = defineStore('game', {
 
       const clubStore = useClubStore();
       const playerStore = usePlayerStore();
-      const heroStore = useHeroStore();
       const sponsorStore = useSponsorStore();
       const fanReputationStore = useFanReputationStore();
-      const leagueStore = useLeagueStore();
 
       // 获取当前俱乐部数据
       const club = clubStore.currentClub;
       if (!club) return;
 
       // 1. 处理赞助商周结算
-      const currentRanking = leagueStore.currentStanding?.position || 10;
-      const winRate = leagueStore.currentStanding ?
-        leagueStore.currentStanding.wins / Math.max(1, leagueStore.currentStanding.wins + leagueStore.currentStanding.losses) :
-        0.5;
+      const currentRanking = 10;
+      const winRate = 0.5;
 
       const sponsorResult = sponsorStore.processWeeklySettlement(
         this.currentWeek,
@@ -174,8 +207,7 @@ export const useGameStore = defineStore('game', {
       club.fans = fanReputationStore.totalFans;
       club.reputation = fanReputationStore.reputation;
 
-      // 3. 检查版本更新
-      heroStore.applyVersionUpdate(this.currentWeek);
+      // 3. 检查版本更新 - 简化版暂不实现
 
       // 4. 选手恢复体力
       club.roster.forEach(player => {
@@ -197,10 +229,7 @@ export const useGameStore = defineStore('game', {
       console.log('Week passed:', this.currentWeek, 'Report:', this.weeklyReport);
     },
     
-    // 检查随机事件
-    checkRandomEvents() {
-      // TODO: 实现事件触发逻辑
-    },
+    // 检查随机事件已在上面定义
     
     // 保存游戏
     saveGame(): string {

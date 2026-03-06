@@ -37,6 +37,21 @@
             <span class="label">转会市场</span>
             <span class="arrow">›</span>
           </div>
+          <div class="menu-item" @click="goTo('/game/heroes')">
+            <span class="icon">🎮</span>
+            <span class="label">英雄图鉴</span>
+            <span class="arrow">›</span>
+          </div>
+          <div class="menu-item" @click="goTo('/game/achievements')">
+            <span class="icon">🏆</span>
+            <span class="label">成就系统</span>
+            <span class="arrow">›</span>
+          </div>
+          <div class="menu-item" @click="goTo('/game/objectives')">
+            <span class="icon">🎯</span>
+            <span class="label">赛季目标</span>
+            <span class="arrow">›</span>
+          </div>
         </div>
       </div>
     </div>

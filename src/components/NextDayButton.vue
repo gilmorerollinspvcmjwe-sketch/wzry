@@ -27,7 +27,7 @@ const emit = defineEmits<{
 }>();
 
 const isPressing = ref(false);
-const pressTimer = ref<number | null>(null);
+// pressTimer removed - not used
 
 const startPress = () => {
   isPressing.value = true;

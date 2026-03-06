@@ -11,6 +11,9 @@ import League from '@/views/league/index.vue';
 import BattleReport from '@/views/battle-report/index.vue';
 import Sponsor from '@/views/sponsor/index.vue';
 import Fans from '@/views/fans/index.vue';
+import Heroes from '@/views/heroes/index.vue';
+import Achievements from '@/views/achievements/index.vue';
+import Objectives from '@/views/objectives/index.vue';
 import NotFound from '@/views/NotFound.vue';
 import { useClubStore } from '@/stores/club';
 
@@ -33,6 +36,9 @@ const routes = [
       { path: 'battle-report', name: 'BattleReport', component: BattleReport },
       { path: 'sponsor', name: 'Sponsor', component: Sponsor },
       { path: 'fans', name: 'Fans', component: Fans },
+      { path: 'heroes', name: 'Heroes', component: Heroes },
+      { path: 'achievements', name: 'Achievements', component: Achievements },
+      { path: 'objectives', name: 'Objectives', component: Objectives },
       { path: 'settings', name: 'Settings', component: Settings },
     ],
     meta: { requiresGame: true }, // 需要游戏初始化

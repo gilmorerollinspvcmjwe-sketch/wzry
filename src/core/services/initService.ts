@@ -1,11 +1,10 @@
 import { useClubStore } from '@/stores/club';
 import { useGameStore } from '@/stores/game';
 import { useMatchStore } from '@/stores/match';
-import { useHeroStore } from '@/stores/hero';
 import { useSponsorStore } from '@/stores/sponsor';
 import { useFanReputationStore } from '@/stores/fanReputation';
-import { usePlayerStore } from '@/stores/player';
 import { Player } from '@/core/models/Player';
+import type { Position } from '@/types';
 
 // AI 俱乐部名称列表
 const aiClubNames = [
@@ -34,10 +33,16 @@ function generateRandomPlayer(position: string, ageRange: [number, number], minP
   
   const firstNames = ['王', '李', '张', '刘', '陈', '杨', '黄', '赵', '周', '吴'];
   const lastNames = ['伟', '芳', '娜', '敏', '静', '强', '磊', '洋', '勇', '军', '杰', '明'];
-  const name = firstNames[Math.floor(Math.random() * firstNames.length)] + 
-               lastNames[Math.floor(Math.random() * lastNames.length)];
+  const firstName = firstNames[Math.floor(Math.random() * firstNames.length)] || '王';
+  const lastName = lastNames[Math.floor(Math.random() * lastNames.length)] || '伟';
+  const name = firstName + lastName;
   
-  return new Player(name, age, pos, potential);
+  // 确保 pos 是有效的 Position 类型
+  const validPos = (['top', 'jungle', 'mid', 'adc', 'support'] as const).includes(pos as any) 
+    ? pos as Position 
+    : 'mid' as Position;
+  
+  return new Player(name, age, validPos, potential);
 }
 
 // 为俱乐部生成初始阵容
@@ -56,10 +61,12 @@ function generateInitialRoster(club: any, isPlayerClub: boolean = false) {
   // 生成替补（2-3人）
   const benchCount = 2 + Math.floor(Math.random() * 2);
   for (let i = 0; i < benchCount; i++) {
-    const pos = positions[Math.floor(Math.random() * positions.length)];
-    const player = generateRandomPlayer(pos, ageRange, minPotential - 10);
-    player.contract.salary = 5 + Math.floor(Math.random() * 10);
-    club.roster.push(player);
+    const randomPos = positions[Math.floor(Math.random() * positions.length)];
+    if (randomPos) {
+      const player = generateRandomPlayer(randomPos, ageRange, minPotential - 10);
+      player.contract.salary = 5 + Math.floor(Math.random() * 10);
+      club.roster.push(player);
+    }
   }
 }
 
@@ -70,8 +77,6 @@ export class InitService {
     try {
       const gameStore = useGameStore();
       const clubStore = useClubStore();
-      const playerStore = usePlayerStore();
-      const heroStore = useHeroStore();
       const sponsorStore = useSponsorStore();
       const fanReputationStore = useFanReputationStore();
 
@@ -109,8 +114,7 @@ export class InitService {
       });
       console.log('AI俱乐部初始阵容生成完成');
 
-      // 初始化英雄系统
-      heroStore.initialize();
+      // 初始化英雄系统 - 简化版无需初始化
       console.log('英雄系统初始化完成');
 
       // 初始化赞助商系统

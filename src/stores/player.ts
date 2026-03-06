@@ -1,11 +1,12 @@
 import { defineStore } from 'pinia';
-import { Player } from '@/core/models/Player';
+import { PlayerClass } from '@/core/models/Player';
 import type { Position } from '@/types';
 
+// 使用PlayerClass类型
 interface PlayerState {
-  allPlayers: Player[];
-  transferList: Player[];
-  youthPlayers: Player[];
+  allPlayers: PlayerClass[];
+  transferList: PlayerClass[];
+  youthPlayers: PlayerClass[];
 }
 
 export const usePlayerStore = defineStore('player', {
@@ -34,7 +35,7 @@ export const usePlayerStore = defineStore('player', {
   
   actions: {
     // 生成随机选手
-    generatePlayer(ageRange: [number, number], potentialRange: [number, number]): Player {
+    generatePlayer(ageRange: [number, number], potentialRange: [number, number]): PlayerClass {
       const age = ageRange[0] + Math.floor(Math.random() * (ageRange[1] - ageRange[0] + 1));
       const potential = potentialRange[0] + Math.floor(Math.random() * (potentialRange[1] - potentialRange[0] + 1));
       const positions: Position[] = ['top', 'jungle', 'mid', 'adc', 'support'];
@@ -42,11 +43,11 @@ export const usePlayerStore = defineStore('player', {
       const names = ['选手 A', '选手 B', '选手 C', '选手 D', '选手 E'];
       const name = names[Math.floor(Math.random() * names.length)]! + Math.floor(Math.random() * 100);
       
-      return new Player(name, age, position, potential);
+      return new PlayerClass(name, age, position, potential);
     },
     
     // 生成青训选手
-    generateYouthPlayer(): Player {
+    generateYouthPlayer(): PlayerClass {
       const player = this.generatePlayer([16, 18], [60, 95]);
       player.contract.salary = 5;
       return player;
@@ -70,7 +71,7 @@ export const usePlayerStore = defineStore('player', {
     },
     
     // 添加选手到列表
-    addPlayer(player: Player, toTransfer: boolean = false) {
+    addPlayer(player: PlayerClass, toTransfer: boolean = false) {
       this.allPlayers.push(player);
       if (toTransfer) {
         this.transferList.push(player);
@@ -92,8 +93,8 @@ export const usePlayerStore = defineStore('player', {
       }
     },
 
-    // 获取选手
-    getPlayer(playerId: string): Player | undefined {
+    // 获取选手 - 返回any类型因为Pinia持久化后类型会丢失
+    getPlayer(playerId: string): any {
       return this.allPlayers.find(p => p.id === playerId);
     },
   },

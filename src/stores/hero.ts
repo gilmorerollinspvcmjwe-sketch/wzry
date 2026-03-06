@@ -1,193 +1,153 @@
-import { defineStore } from 'pinia';
-import { heroSystem, type HeroPoolAnalysis, type VersionUpdate } from '@/core/services/heroSystem';
-import { heroes } from '@/data/heroes';
-import type { HeroRole, Position } from '@/types';
-import type { Hero } from '@/core/models/Hero';
+import { defineStore } from 'pinia'
+import { ref, computed } from 'vue'
+import type { Hero, VersionChange } from '@/core/models/Hero'
+import { heroes } from '@/data/heroes'
 
-// 选手英雄熟练度数据
-interface PlayerHeroData {
-  playerId: string;
-  heroMasteries: Record<string, number>; // heroId -> mastery
-}
+export const useHeroStore = defineStore('hero', () => {
+  // State
+  const allHeroes = ref<Hero[]>(heroes)
+  const isLoading = ref(false)
+  const error = ref<string | null>(null)
 
-interface HeroState {
-  initialized: boolean;
-  playerHeroData: Map<string, PlayerHeroData>;
-  currentVersion: string;
-  versionHistory: VersionUpdate[];
-  lastUpdateWeek: number;
-}
+  // Getters
+  const getHeroById = computed(() => {
+    return (heroId: string) => allHeroes.value.find(h => h.id === heroId)
+  })
 
-export const useHeroStore = defineStore('hero', {
-  state: (): HeroState => ({
-    initialized: false,
-    playerHeroData: new Map(),
-    currentVersion: '1.0.0',
-    versionHistory: [],
-    lastUpdateWeek: 0,
-  }),
+  const getHeroesByRole = computed(() => {
+    return (role: string) => allHeroes.value.filter(h => h.role === role)
+  })
 
-  getters: {
-    // 获取所有英雄
-    allHeroes: () => heroSystem.getAllHeroes(),
+  const getMetaHeroes = computed(() => {
+    return allHeroes.value.filter(h => h.tier <= 2)
+  })
 
-    // 获取版本强势英雄
-    metaHeroes: () => heroSystem.getMetaHeroes(2),
+  const getHeroesByTag = computed(() => {
+    return (tag: string) => allHeroes.value.filter(h => h.tags.includes(tag))
+  })
 
-    // 获取当前版本
-    currentVersion: (state) => state.currentVersion,
+  // 获取克制某英雄的英雄列表
+  const getCounters = computed(() => {
+    return (heroId: string) => {
+      const hero = allHeroes.value.find(h => h.id === heroId)
+      return hero ? allHeroes.value.filter(h => hero.counteredBy.includes(h.id)) : []
+    }
+  })
 
-    // 获取版本历史
-    versionHistory: (state) => state.versionHistory,
+  // 获取被某英雄克制的英雄列表
+  const getCounteredBy = computed(() => {
+    return (heroId: string) => {
+      const hero = allHeroes.value.find(h => h.id === heroId)
+      return hero ? allHeroes.value.filter(h => hero.counters.includes(h.id)) : []
+    }
+  })
 
-    // 获取选手英雄熟练度
-    getPlayerHeroMasteries: (state) => (playerId: string): Map<string, number> => {
-      const data = state.playerHeroData.get(playerId);
-      if (!data) return new Map();
-      return new Map(Object.entries(data.heroMasteries));
-    },
+  // 获取某英雄的版本变化历史
+  const getVersionHistory = computed(() => {
+    return (heroId: string) => {
+      const hero = allHeroes.value.find(h => h.id === heroId)
+      return hero?.versionHistory || []
+    }
+  })
 
-    // 获取选手特定英雄熟练度
-    getHeroMastery: (state) => (playerId: string, heroId: string): number => {
-      const data = state.playerHeroData.get(playerId);
-      if (!data) return 0;
-      return data.heroMasteries[heroId] || 0;
-    },
+  // Actions
+  function getHeroTierColor(tier: number): string {
+    const colors: Record<number, string> = {
+      0: '#ff4d4f', // T0 - 红色
+      1: '#ff7a45', // T1 - 橙色
+      2: '#ffa940', // T2 - 黄色
+      3: '#73d13d', // T3 - 绿色
+      4: '#40a9ff', // T4 - 蓝色
+      5: '#8c8c8c'  // T5 - 灰色
+    }
+    return colors[tier] || '#8c8c8c'
+  }
 
-    // 分析选手英雄池
-    getPlayerHeroPoolAnalysis: (state) => (playerId: string): HeroPoolAnalysis | null => {
-      const masteries = new Map<string, number>();
-      const data = state.playerHeroData.get(playerId);
-      if (data) {
-        Object.entries(data.heroMasteries).forEach(([heroId, mastery]) => {
-          masteries.set(heroId, mastery);
-        });
-      }
-      return heroSystem.analyzeHeroPool(masteries);
-    },
+  function getRoleIcon(role: string): string {
+    const icons: Record<string, string> = {
+      tank: '🛡️',
+      fighter: '⚔️',
+      assassin: '🗡️',
+      mage: '🔮',
+      marksman: '🏹',
+      support: '💚'
+    }
+    return icons[role] || '❓'
+  }
 
-    // 获取推荐英雄
-    getRecommendedHeroes: () => (position: Position, playerId: string, limit: number = 5) => {
-      const masteries = new Map<string, number>();
-      // 这里需要从store获取选手的熟练度数据
-      return heroSystem.recommendHeroesForPosition(position, masteries, limit);
-    },
+  function getRoleName(role: string): string {
+    const names: Record<string, string> = {
+      tank: '坦克',
+      fighter: '战士',
+      assassin: '刺客',
+      mage: '法师',
+      marksman: '射手',
+      support: '辅助'
+    }
+    return names[role] || role
+  }
 
-    // 根据定位筛选英雄
-    getHeroesByRole: () => (role: HeroRole) => heroSystem.getHeroesByRole(role),
+  // 获取版本变化类型文本
+  function getChangeTypeText(type: VersionChange['change']): string {
+    const texts: Record<VersionChange['change'], string> = {
+      'buff': '增强',
+      'nerf': '削弱',
+      'adjust': '调整',
+      'rework': '重做'
+    }
+    return texts[type]
+  }
 
-    // 根据位置筛选英雄
-    getHeroesByPosition: () => (position: Position) => heroSystem.getHeroesByPosition(position),
+  // 获取版本变化类型颜色
+  function getChangeTypeColor(type: VersionChange['change']): string {
+    const colors: Record<VersionChange['change'], string> = {
+      'buff': '#52c41a',
+      'nerf': '#ff4d4f',
+      'adjust': '#faad14',
+      'rework': '#722ed1'
+    }
+    return colors[type]
+  }
 
-    // 获取英雄
-    getHero: () => (heroId: string): Hero | undefined => heroSystem.getHero(heroId),
-  },
+  // 获取所有标签列表
+  const allTags = computed(() => {
+    const tagSet = new Set<string>()
+    allHeroes.value.forEach(hero => {
+      hero.tags.forEach(tag => tagSet.add(tag))
+    })
+    return Array.from(tagSet)
+  })
 
-  actions: {
-    // 初始化英雄系统
-    initialize() {
-      if (this.initialized) return;
+  // 更新英雄强度（版本更新时调用）
+  function updateHeroTier(heroId: string, _newTier: 0 | 1 | 2 | 3 | 4 | 5, change: VersionChange) {
+    const hero = allHeroes.value.find(h => h.id === heroId)
+    if (hero) {
+      hero.addVersionChange(change)
+    }
+  }
 
-      heroSystem.initialize(heroes);
-      this.currentVersion = heroSystem.getCurrentVersion();
-      this.initialized = true;
-    },
-
-    // 为选手初始化英雄熟练度
-    initializePlayerHeroData(playerId: string, position: Position) {
-      if (this.playerHeroData.has(playerId)) return;
-
-      const heroMasteries: Record<string, number> = {};
-
-      // 根据位置初始化一些基础熟练度
-      const positionHeroes = heroSystem.getHeroesByPosition(position);
-      positionHeroes.slice(0, 5).forEach(hero => {
-        // 基础熟练度 10-30
-        heroMasteries[hero.id] = 10 + Math.floor(Math.random() * 20);
-      });
-
-      this.playerHeroData.set(playerId, {
-        playerId,
-        heroMasteries,
-      });
-    },
-
-    // 增加英雄熟练度
-    addHeroMastery(playerId: string, heroId: string, amount: number) {
-      const data = this.playerHeroData.get(playerId);
-      if (!data) return;
-
-      const current = data.heroMasteries[heroId] || 0;
-      data.heroMasteries[heroId] = Math.min(100, current + amount);
-    },
-
-    // 训练英雄熟练度
-    trainHeroMastery(playerId: string, heroId: string, intensity: number = 1) {
-      const baseGain = 2 * intensity;
-      const randomBonus = Math.random() * 2;
-      const totalGain = baseGain + randomBonus;
-
-      this.addHeroMastery(playerId, heroId, totalGain);
-    },
-
-    // 比赛后增加熟练度
-    addMatchMastery(playerId: string, heroId: string, performance: number) {
-      // 根据表现增加熟练度
-      const baseGain = 1;
-      const performanceBonus = performance * 0.5;
-      const totalGain = baseGain + performanceBonus;
-
-      this.addHeroMastery(playerId, heroId, totalGain);
-    },
-
-    // 应用版本更新
-    applyVersionUpdate(currentWeek: number) {
-      // 每4周进行一次版本更新
-      if (currentWeek - this.lastUpdateWeek < 4) return;
-
-      const update = heroSystem.generateRandomUpdate();
-      heroSystem.applyVersionUpdate(update);
-
-      this.currentVersion = update.version;
-      this.versionHistory.push(update);
-      this.lastUpdateWeek = currentWeek;
-    },
-
-    // 获取英雄熟练度等级信息
-    getMasteryLevel(mastery: number) {
-      return heroSystem.getMasteryLevel(mastery);
-    },
-
-    // 计算英雄加成
-    calculateHeroBonus(playerStats: number, heroMastery: number): number {
-      return heroSystem.calculateHeroBonus(playerStats, heroMastery);
-    },
-
-    // 重置数据
-    reset() {
-      this.playerHeroData.clear();
-      this.versionHistory = [];
-      this.currentVersion = '1.0.0';
-      this.lastUpdateWeek = 0;
-      this.initialized = false;
-    },
-  },
-
-  persist: {
-    serializer: {
-      serialize: (state) => {
-        return JSON.stringify({
-          ...state,
-          playerHeroData: Array.from(state.playerHeroData.entries()),
-        });
-      },
-      deserialize: (value) => {
-        const parsed = JSON.parse(value);
-        return {
-          ...parsed,
-          playerHeroData: new Map(parsed.playerHeroData),
-        };
-      },
-    },
-  },
-});
+  return {
+    // State
+    allHeroes,
+    isLoading,
+    error,
+    
+    // Getters
+    getHeroById,
+    getHeroesByRole,
+    getMetaHeroes,
+    getHeroesByTag,
+    getCounters,
+    getCounteredBy,
+    getVersionHistory,
+    allTags,
+    
+    // Actions
+    getHeroTierColor,
+    getRoleIcon,
+    getRoleName,
+    getChangeTypeText,
+    getChangeTypeColor,
+    updateHeroTier
+  }
+})

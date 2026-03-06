@@ -2,19 +2,22 @@
 import { computed, ref } from 'vue';
 import { useClubStore } from '@/stores/club';
 import { usePlayerStore } from '@/stores/player';
+import { useHeroStore } from '@/stores/hero';
 import { Player } from '@/core/models/Player';
 import type { PlayerStats } from '@/types';
 
 const clubStore = useClubStore();
 const playerStore = usePlayerStore();
+const heroStore = useHeroStore();
 
 const activeTab = ref<'roster' | 'youth'>('roster');
 const selectedPlayer = ref<Player | null>(null);
 const showPlayerDetail = ref(false);
+const playerDetailTab = ref<'stats' | 'heroes' | 'data'>('stats');
 
 // 当前阵容
-const roster = computed(() => clubStore.currentClub?.roster || []);
-const youthTeam = computed(() => clubStore.currentClub?.youthTeam || []);
+const roster = computed(() => clubStore.fixedRoster);
+const youthTeam = computed(() => clubStore.fixedYouthTeam);
 
 // 位置名称映射
 const positionNames: Record<string, string> = {
@@ -34,10 +37,38 @@ const statNames: Record<keyof PlayerStats, string> = {
   heroPool: '英雄池',
 };
 
+// 性格名称映射
+const personalityNames: Record<string, string> = {
+  trainingAttitude: '训练态度',
+  playStyle: '比赛风格',
+  teamwork: '团队合作',
+  pressureResistance: '抗压能力',
+  socialSkill: '社交能力',
+};
+
+const personalityValueNames: Record<string, string> = {
+  diligent: '勤奋',
+  lazy: '懒惰',
+  'self-disciplined': '自律',
+  aggressive: '激进',
+  stable: '稳健',
+  flexible: '灵活',
+  'lone-wolf': '独狼',
+  'team-player': '团队型',
+  leader: '领袖',
+  clutch: '大心脏',
+  fragile: '脆弱',
+  normal: '普通',
+  introverted: '内向',
+  extroverted: '外向',
+  charismatic: '魅力型',
+};
+
 // 打开选手详情
 const openPlayerDetail = (player: any) => {
   selectedPlayer.value = player as Player;
   showPlayerDetail.value = true;
+  playerDetailTab.value = 'stats';
 };
 
 // 关闭选手详情
@@ -100,6 +131,43 @@ const formatDate = (date: Date | string) => {
   const d = date instanceof Date ? date : new Date(date);
   if (isNaN(d.getTime())) return '未知日期';
   return `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}-${d.getDate().toString().padStart(2, '0')}`;
+};
+
+// 获取英雄名称
+const getHeroName = (heroId: string): string => {
+  const hero = heroStore.getHeroById(heroId);
+  return hero?.name || heroId;
+};
+
+// 获取英雄定位
+const getHeroRole = (heroId: string): string => {
+  const hero = heroStore.getHeroById(heroId);
+  return hero ? heroStore.getRoleName(hero.role) : '';
+};
+
+// 获取选手英雄使用统计
+const getPlayerHeroStats = (player: any) => {
+  return (player as any).getHeroStatsList?.() || [];
+};
+
+// 获取选手英雄偏好
+const getPlayerHeroPreference = (player: any) => {
+  return player.heroPreference || { preferredRoles: [], preferredTags: [], favoriteHeroes: [] };
+};
+
+// 获取选手性格
+const getPlayerPersonality = (player: any) => {
+  return player.personality || {};
+};
+
+// 获取选手天赋
+const getPlayerTalents = (player: any) => {
+  return player.talents || [];
+};
+
+// 获取选手生涯数据
+const getPlayerCareerStats = (player: any) => {
+  return player.careerStats || { totalMatches: 0, wins: 0, losses: 0, winRate: 0, mvpCount: 0, averageKDA: 0 };
 };
 </script>
 
@@ -239,110 +307,308 @@ const formatDate = (date: Date | string) => {
     
     <!-- 选手详情弹窗 -->
     <div v-if="showPlayerDetail && selectedPlayer" class="modal-overlay" @click="closePlayerDetail">
-      <div class="modal-content" @click.stop>
+      <div class="modal-content player-detail-modal" @click.stop>
+        <!-- 弹窗头部 -->
         <div class="modal-header">
-          <h3>{{ selectedPlayer.name }}</h3>
+          <div class="player-header-info">
+            <div class="player-avatar">
+              {{ selectedPlayer.name[0] }}
+            </div>
+            <div class="player-title">
+              <h3>{{ selectedPlayer.name }}</h3>
+              <div class="player-subtitle">
+                <span class="position-tag" :class="selectedPlayer.position">
+                  {{ positionNames[selectedPlayer.position] }}
+                </span>
+                <span class="age-tag">{{ selectedPlayer.age }}岁</span>
+              </div>
+            </div>
+          </div>
           <button class="close-btn" @click="closePlayerDetail">×</button>
+        </div>
+
+        <!-- 详情标签页 -->
+        <div class="detail-tabs">
+          <button 
+            class="detail-tab"
+            :class="{ active: playerDetailTab === 'stats' }"
+            @click="playerDetailTab = 'stats'"
+          >
+            属性
+          </button>
+          <button 
+            class="detail-tab"
+            :class="{ active: playerDetailTab === 'heroes' }"
+            @click="playerDetailTab = 'heroes'"
+          >
+            英雄
+          </button>
+          <button 
+            class="detail-tab"
+            :class="{ active: playerDetailTab === 'data' }"
+            @click="playerDetailTab = 'data'"
+          >
+            数据
+          </button>
         </div>
         
         <div class="modal-body">
-          <!-- 基本信息 -->
-          <div class="info-section">
-            <div class="info-row">
-              <span class="info-label">位置</span>
-              <span class="info-value">{{ positionNames[selectedPlayer.position] }}</span>
-            </div>
-            <div class="info-row">
-              <span class="info-label">年龄</span>
-              <span class="info-value">{{ selectedPlayer.age }}岁</span>
-            </div>
-            <div class="info-row">
-              <span class="info-label">潜力</span>
-              <span class="info-value">{{ selectedPlayer.potential }}</span>
-            </div>
-            <div class="info-row">
-              <span class="info-label">总实力</span>
-              <span class="info-value highlight">{{ (selectedPlayer as any).getTotalPower?.() || 0 }}</span>
-            </div>
-          </div>
-          
-          <!-- 属性详情 -->
-          <div class="stats-section">
-            <h4>属性详情</h4>
-            <div 
-              v-for="(value, key) in selectedPlayer.stats" 
-              :key="key"
-              class="detail-stat-row"
-            >
-              <span class="stat-name">{{ statNames[key] }}</span>
-              <div class="stat-bar">
-                <div class="stat-fill" :style="{ width: value + '%' }"></div>
-              </div>
-              <span class="stat-num">{{ Math.round(value) }}</span>
-            </div>
-          </div>
-          
-          <!-- 状态详情 -->
-          <div class="condition-section">
-            <h4>当前状态</h4>
-            <div class="condition-grid">
-              <div class="condition-item">
-                <span class="condition-label">体力</span>
-                <span class="condition-value" :style="{ color: getStaminaColor(selectedPlayer.condition.stamina) }">
-                  {{ selectedPlayer.condition.stamina }}
-                </span>
-              </div>
-              <div class="condition-item">
-                <span class="condition-label">心态</span>
-                <span class="condition-value">{{ selectedPlayer.condition.mentality }}</span>
-              </div>
-              <div class="condition-item">
-                <span class="condition-label">士气</span>
-                <span class="condition-value">{{ selectedPlayer.condition.morale }}</span>
-              </div>
-              <div class="condition-item">
-                <span class="condition-label">伤病</span>
-                <span class="condition-value" :class="{ injured: selectedPlayer.condition.injury > 0 }">
-                  {{ selectedPlayer.condition.injury }}
-                </span>
+          <!-- 属性标签页 -->
+          <div v-if="playerDetailTab === 'stats'" class="tab-content">
+            <!-- 基础信息 -->
+            <div class="info-section">
+              <h4>基础信息</h4>
+              <div class="info-grid">
+                <div class="info-item">
+                  <span class="info-label">潜力</span>
+                  <span class="info-value">{{ selectedPlayer.potential }}</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">总实力</span>
+                  <span class="info-value highlight">{{ (selectedPlayer as any).getTotalPower?.() || 0 }}</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">周薪</span>
+                  <span class="info-value">{{ selectedPlayer.contract.salary }}万</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">合同到期</span>
+                  <span class="info-value">{{ formatDate(selectedPlayer.contract.endDate) }}</span>
+                </div>
               </div>
             </div>
-          </div>
-          
-          <!-- 合同信息 -->
-          <div class="contract-section">
-            <h4>合同信息</h4>
-            <div class="info-row">
-              <span class="info-label">周薪</span>
-              <span class="info-value">{{ selectedPlayer.contract.salary }}万</span>
-            </div>
-            <div class="info-row">
-              <span class="info-label">违约金</span>
-              <span class="info-value">{{ selectedPlayer.contract.buyoutClause.toFixed(1) }}万</span>
-            </div>
-            <div class="info-row">
-              <span class="info-label">到期</span>
-              <span class="info-value">{{ formatDate(selectedPlayer.contract.endDate) }}</span>
-            </div>
-          </div>
-          
-          <!-- 操作按钮 -->
-          <div class="action-section" v-if="activeTab === 'roster'">
-            <h4>训练</h4>
-            <div class="train-buttons">
-              <button 
-                v-for="(name, key) in statNames" 
+            
+            <!-- 属性详情 -->
+            <div class="stats-section">
+              <h4>属性详情</h4>
+              <div 
+                v-for="(value, key) in selectedPlayer.stats" 
                 :key="key"
-                class="train-btn"
-                :disabled="selectedPlayer.condition.stamina < 20"
-                @click="trainPlayer(selectedPlayer, key)"
+                class="detail-stat-row"
               >
-                {{ name }}
-              </button>
+                <span class="stat-name">{{ statNames[key] }}</span>
+                <div class="stat-bar">
+                  <div class="stat-fill" :style="{ width: value + '%' }"></div>
+                </div>
+                <span class="stat-num">{{ Math.round(value) }}</span>
+              </div>
             </div>
-            <p class="train-hint" v-if="selectedPlayer.condition.stamina < 20">
-              体力不足，请先休息
-            </p>
+            
+            <!-- 性格特质 -->
+            <div class="personality-section" v-if="Object.keys(getPlayerPersonality(selectedPlayer)).length > 0">
+              <h4>性格特质</h4>
+              <div class="personality-grid">
+                <div 
+                  v-for="(value, key) in getPlayerPersonality(selectedPlayer)" 
+                  :key="key"
+                  class="personality-item"
+                >
+                  <span class="personality-label">{{ personalityNames[key] || key }}</span>
+                  <span class="personality-value">{{ personalityValueNames[value] || value }}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 特殊天赋 -->
+            <div class="talents-section" v-if="getPlayerTalents(selectedPlayer).length > 0">
+              <h4>特殊天赋</h4>
+              <div class="talents-list">
+                <div 
+                  v-for="talent in getPlayerTalents(selectedPlayer)" 
+                  :key="talent.id"
+                  class="talent-item"
+                >
+                  <span class="talent-name">{{ talent.name }}</span>
+                  <span class="talent-desc">{{ talent.description }}</span>
+                </div>
+              </div>
+            </div>
+            
+            <!-- 当前状态 -->
+            <div class="condition-section">
+              <h4>当前状态</h4>
+              <div class="condition-grid">
+                <div class="condition-item">
+                  <span class="condition-label">体力</span>
+                  <span class="condition-value" :style="{ color: getStaminaColor(selectedPlayer.condition.stamina) }">
+                    {{ selectedPlayer.condition.stamina }}
+                  </span>
+                </div>
+                <div class="condition-item">
+                  <span class="condition-label">心态</span>
+                  <span class="condition-value">{{ selectedPlayer.condition.mentality }}</span>
+                </div>
+                <div class="condition-item">
+                  <span class="condition-label">士气</span>
+                  <span class="condition-value">{{ selectedPlayer.condition.morale }}</span>
+                </div>
+                <div class="condition-item">
+                  <span class="condition-label">伤病</span>
+                  <span class="condition-value" :class="{ injured: selectedPlayer.condition.injury > 0 }">
+                    {{ selectedPlayer.condition.injury }}
+                  </span>
+                </div>
+              </div>
+            </div>
+            
+            <!-- 训练 -->
+            <div class="action-section" v-if="activeTab === 'roster'">
+              <h4>训练</h4>
+              <div class="train-buttons">
+                <button 
+                  v-for="(name, key) in statNames" 
+                  :key="key"
+                  class="train-btn"
+                  :disabled="selectedPlayer.condition.stamina < 20"
+                  @click="trainPlayer(selectedPlayer, key)"
+                >
+                  {{ name }}
+                </button>
+              </div>
+              <p class="train-hint" v-if="selectedPlayer.condition.stamina < 20">
+                体力不足，请先休息
+              </p>
+            </div>
+          </div>
+
+          <!-- 英雄标签页 -->
+          <div v-else-if="playerDetailTab === 'heroes'" class="tab-content">
+            <!-- 英雄偏好 -->
+            <div class="hero-preference-section">
+              <h4>英雄偏好</h4>
+              <div class="preference-content">
+                <div class="preference-item" v-if="getPlayerHeroPreference(selectedPlayer).preferredRoles.length > 0">
+                  <span class="preference-label">擅长定位</span>
+                  <div class="preference-tags">
+                    <span 
+                      v-for="role in getPlayerHeroPreference(selectedPlayer).preferredRoles" 
+                      :key="role"
+                      class="preference-tag"
+                    >
+                      {{ heroStore.getRoleName(role) }}
+                    </span>
+                  </div>
+                </div>
+                <div class="preference-item" v-if="getPlayerHeroPreference(selectedPlayer).preferredTags.length > 0">
+                  <span class="preference-label">偏好标签</span>
+                  <div class="preference-tags">
+                    <span 
+                      v-for="tag in getPlayerHeroPreference(selectedPlayer).preferredTags" 
+                      :key="tag"
+                      class="preference-tag tag-style"
+                    >
+                      {{ tag }}
+                    </span>
+                  </div>
+                </div>
+                <div class="preference-item" v-if="getPlayerHeroPreference(selectedPlayer).favoriteHeroes.length > 0">
+                  <span class="preference-label">Favorite英雄</span>
+                  <div class="preference-tags">
+                    <span 
+                      v-for="heroId in getPlayerHeroPreference(selectedPlayer).favoriteHeroes" 
+                      :key="heroId"
+                      class="preference-tag hero-style"
+                    >
+                      {{ getHeroName(heroId) }}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 英雄使用统计 -->
+            <div class="hero-stats-section">
+              <h4>英雄使用统计</h4>
+              <div v-if="getPlayerHeroStats(selectedPlayer).length > 0" class="hero-stats-list">
+                <div 
+                  v-for="stat in getPlayerHeroStats(selectedPlayer)" 
+                  :key="stat.heroId"
+                  class="hero-stat-item"
+                >
+                  <div class="hero-stat-header">
+                    <div class="hero-info">
+                      <span class="hero-name">{{ stat.heroName }}</span>
+                      <span class="hero-role">{{ getHeroRole(stat.heroId) }}</span>
+                    </div>
+                    <div class="hero-winrate" :class="{ good: stat.winRate >= 55, bad: stat.winRate < 45 }">
+                      {{ stat.winRate }}%
+                    </div>
+                  </div>
+                  <div class="hero-stat-details">
+                    <div class="stat-detail">
+                      <span class="detail-label">场次</span>
+                      <span class="detail-value">{{ stat.games }}</span>
+                    </div>
+                    <div class="stat-detail">
+                      <span class="detail-label">胜场</span>
+                      <span class="detail-value win">{{ stat.wins }}</span>
+                    </div>
+                    <div class="stat-detail">
+                      <span class="detail-label">KDA</span>
+                      <span class="detail-value">{{ stat.avgKDA }}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div v-else class="empty-hero-stats">
+                <p>暂无英雄使用记录</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- 数据标签页 -->
+          <div v-else-if="playerDetailTab === 'data'" class="tab-content">
+            <!-- 生涯统计 -->
+            <div class="career-stats-section">
+              <h4>生涯统计</h4>
+              <div class="career-stats-grid">
+                <div class="career-stat-item">
+                  <span class="career-stat-value">{{ getPlayerCareerStats(selectedPlayer).totalMatches }}</span>
+                  <span class="career-stat-label">总场次</span>
+                </div>
+                <div class="career-stat-item">
+                  <span class="career-stat-value win">{{ getPlayerCareerStats(selectedPlayer).wins }}</span>
+                  <span class="career-stat-label">胜场</span>
+                </div>
+                <div class="career-stat-item">
+                  <span class="career-stat-value loss">{{ getPlayerCareerStats(selectedPlayer).losses }}</span>
+                  <span class="career-stat-label">负场</span>
+                </div>
+                <div class="career-stat-item">
+                  <span class="career-stat-value" :class="{ good: getPlayerCareerStats(selectedPlayer).winRate >= 55 }">
+                    {{ getPlayerCareerStats(selectedPlayer).winRate }}%
+                  </span>
+                  <span class="career-stat-label">胜率</span>
+                </div>
+                <div class="career-stat-item">
+                  <span class="career-stat-value">{{ getPlayerCareerStats(selectedPlayer).mvpCount || 0 }}</span>
+                  <span class="career-stat-label">MVP</span>
+                </div>
+                <div class="career-stat-item">
+                  <span class="career-stat-value">{{ getPlayerCareerStats(selectedPlayer).averageKDA || 0 }}</span>
+                  <span class="career-stat-label">平均KDA</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 合同信息 -->
+            <div class="contract-section">
+              <h4>合同信息</h4>
+              <div class="info-list">
+                <div class="info-row">
+                  <span class="info-label">周薪</span>
+                  <span class="info-value">{{ selectedPlayer.contract.salary }}万</span>
+                </div>
+                <div class="info-row">
+                  <span class="info-label">违约金</span>
+                  <span class="info-value">{{ selectedPlayer.contract.buyoutClause.toFixed(1) }}万</span>
+                </div>
+                <div class="info-row">
+                  <span class="info-label">合同到期</span>
+                  <span class="info-value">{{ formatDate(selectedPlayer.contract.endDate) }}</span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
         
@@ -602,106 +868,247 @@ const formatDate = (date: Date | string) => {
   bottom: 0;
   background: rgba(0,0,0,0.5);
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: center;
-  padding: 20px;
   z-index: 1000;
+}
+
+@media (min-width: 768px) {
+  .modal-overlay {
+    align-items: center;
+  }
 }
 
 .modal-content {
   background: white;
-  border-radius: 16px;
+  border-radius: 20px 20px 0 0;
   width: 100%;
-  max-width: 400px;
-  max-height: 80vh;
+  max-width: 500px;
+  max-height: 85vh;
   overflow-y: auto;
+  animation: slideUp 0.3s ease;
 }
 
-.modal-header {
+@media (min-width: 768px) {
+  .modal-content {
+    border-radius: 16px;
+    max-height: 80vh;
+    animation: fadeIn 0.3s ease;
+  }
+}
+
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+/* 选手详情弹窗样式 */
+.player-detail-modal .modal-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding: 20px;
   border-bottom: 1px solid #eee;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
 }
 
-.modal-header h3 {
-  margin: 0;
-  font-size: 20px;
-  color: #333;
+.player-header-info {
+  display: flex;
+  align-items: center;
+  gap: 14px;
 }
 
-.close-btn {
-  background: none;
-  border: none;
-  font-size: 28px;
-  color: #999;
-  cursor: pointer;
-  padding: 0;
-  width: 32px;
-  height: 32px;
+.player-avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.2);
   display: flex;
   align-items: center;
   justify-content: center;
+  font-size: 24px;
+  font-weight: bold;
+  border: 2px solid rgba(255,255,255,0.3);
+}
+
+.player-title h3 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: bold;
+}
+
+.player-subtitle {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.position-tag {
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: bold;
+  color: white;
+}
+
+.position-tag.top { background: #e74c3c; }
+.position-tag.jungle { background: #27ae60; }
+.position-tag.mid { background: #3498db; }
+.position-tag.adc { background: #f39c12; }
+.position-tag.support { background: #9b59b6; }
+
+.age-tag {
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  background: rgba(255,255,255,0.2);
+}
+
+.close-btn {
+  background: rgba(255,255,255,0.2);
+  border: none;
+  font-size: 24px;
+  color: white;
+  cursor: pointer;
+  padding: 0;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.2s;
+}
+
+.close-btn:hover {
+  background: rgba(255,255,255,0.3);
+}
+
+/* 详情标签页 */
+.detail-tabs {
+  display: flex;
+  border-bottom: 1px solid #eee;
+  background: #f9f9f9;
+}
+
+.detail-tab {
+  flex: 1;
+  padding: 14px;
+  border: none;
+  background: transparent;
+  color: #666;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+}
+
+.detail-tab.active {
+  color: #007bff;
+  font-weight: 600;
+}
+
+.detail-tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 20%;
+  right: 20%;
+  height: 3px;
+  background: #007bff;
+  border-radius: 3px 3px 0 0;
 }
 
 .modal-body {
   padding: 20px;
 }
 
-.modal-body h4 {
-  font-size: 14px;
-  color: #666;
-  margin: 0 0 12px 0;
+.tab-content {
+  animation: fadeIn 0.3s ease;
 }
 
+/* 通用区块样式 */
 .info-section,
 .stats-section,
+.personality-section,
+.talents-section,
 .condition-section,
-.contract-section,
-.action-section {
-  margin-bottom: 20px;
-  padding-bottom: 20px;
+.action-section,
+.hero-preference-section,
+.hero-stats-section,
+.career-stats-section,
+.contract-section {
+  margin-bottom: 24px;
+  padding-bottom: 24px;
   border-bottom: 1px solid #eee;
 }
 
 .info-section:last-child,
 .stats-section:last-child,
+.personality-section:last-child,
+.talents-section:last-child,
 .condition-section:last-child,
-.contract-section:last-child,
-.action-section:last-child {
+.action-section:last-child,
+.hero-preference-section:last-child,
+.hero-stats-section:last-child,
+.career-stats-section:last-child,
+.contract-section:last-child {
   border-bottom: none;
   margin-bottom: 0;
   padding-bottom: 0;
 }
 
-.info-row {
+h4 {
+  font-size: 15px;
+  color: #333;
+  margin: 0 0 14px 0;
+  font-weight: 600;
+}
+
+/* 信息网格 */
+.info-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.info-item {
   display: flex;
-  justify-content: space-between;
-  padding: 8px 0;
-  font-size: 14px;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
+  background: #f9f9f9;
+  border-radius: 8px;
 }
 
 .info-label {
-  color: #666;
+  font-size: 12px;
+  color: #999;
 }
 
 .info-value {
+  font-size: 16px;
+  font-weight: 600;
   color: #333;
-  font-weight: 500;
 }
 
 .info-value.highlight {
   color: #007bff;
   font-size: 18px;
-  font-weight: bold;
 }
 
+/* 属性详情 */
 .detail-stat-row {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 10px;
+  gap: 12px;
+  margin-bottom: 12px;
 }
 
 .stat-name {
@@ -711,13 +1118,69 @@ const formatDate = (date: Date | string) => {
 }
 
 .stat-num {
-  width: 30px;
+  width: 36px;
   text-align: right;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: bold;
   color: #333;
 }
 
+/* 性格特质 */
+.personality-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.personality-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
+  background: #f9f9f9;
+  border-radius: 8px;
+}
+
+.personality-label {
+  font-size: 12px;
+  color: #999;
+}
+
+.personality-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+}
+
+/* 天赋 */
+.talents-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.talent-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
+  background: linear-gradient(135deg, #fff9e6 0%, #fff5d6 100%);
+  border-radius: 8px;
+  border-left: 3px solid #faad14;
+}
+
+.talent-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #d48806;
+}
+
+.talent-desc {
+  font-size: 12px;
+  color: #666;
+}
+
+/* 状态 */
 .condition-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -727,7 +1190,8 @@ const formatDate = (date: Date | string) => {
 .condition-item {
   display: flex;
   justify-content: space-between;
-  padding: 10px;
+  align-items: center;
+  padding: 12px;
   background: #f9f9f9;
   border-radius: 8px;
 }
@@ -738,7 +1202,7 @@ const formatDate = (date: Date | string) => {
 }
 
 .condition-value {
-  font-size: 14px;
+  font-size: 16px;
   font-weight: bold;
   color: #333;
 }
@@ -751,18 +1215,18 @@ const formatDate = (date: Date | string) => {
 .train-buttons {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
+  gap: 10px;
 }
 
 .train-btn {
-  padding: 10px;
+  padding: 12px;
   border: 1px solid #007bff;
   border-radius: 8px;
   background: white;
   color: #007bff;
   font-size: 13px;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all 0.2s;
 }
 
 .train-btn:active:not(:disabled) {
@@ -780,8 +1244,191 @@ const formatDate = (date: Date | string) => {
 .train-hint {
   font-size: 12px;
   color: #dc3545;
-  margin-top: 10px;
+  margin-top: 12px;
   text-align: center;
+}
+
+/* 英雄偏好 */
+.preference-content {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.preference-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.preference-label {
+  font-size: 13px;
+  color: #666;
+}
+
+.preference-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.preference-tag {
+  padding: 6px 12px;
+  border-radius: 16px;
+  font-size: 13px;
+  background: #e6f7ff;
+  color: #1890ff;
+}
+
+.preference-tag.tag-style {
+  background: #f6ffed;
+  color: #52c41a;
+}
+
+.preference-tag.hero-style {
+  background: #fff7e6;
+  color: #fa8c16;
+}
+
+/* 英雄统计 */
+.hero-stats-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.hero-stat-item {
+  padding: 14px;
+  background: #f9f9f9;
+  border-radius: 10px;
+}
+
+.hero-stat-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.hero-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.hero-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: #333;
+}
+
+.hero-role {
+  font-size: 12px;
+  color: #999;
+}
+
+.hero-winrate {
+  font-size: 18px;
+  font-weight: bold;
+  color: #333;
+}
+
+.hero-winrate.good {
+  color: #52c41a;
+}
+
+.hero-winrate.bad {
+  color: #ff4d4f;
+}
+
+.hero-stat-details {
+  display: flex;
+  gap: 20px;
+}
+
+.stat-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.detail-label {
+  font-size: 11px;
+  color: #999;
+}
+
+.detail-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+}
+
+.detail-value.win {
+  color: #52c41a;
+}
+
+.empty-hero-stats {
+  text-align: center;
+  padding: 30px;
+  color: #999;
+  background: #f9f9f9;
+  border-radius: 10px;
+}
+
+/* 生涯统计 */
+.career-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.career-stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 16px 10px;
+  background: #f9f9f9;
+  border-radius: 10px;
+}
+
+.career-stat-value {
+  font-size: 22px;
+  font-weight: bold;
+  color: #333;
+}
+
+.career-stat-value.win {
+  color: #52c41a;
+}
+
+.career-stat-value.loss {
+  color: #ff4d4f;
+}
+
+.career-stat-value.good {
+  color: #52c41a;
+}
+
+.career-stat-label {
+  font-size: 12px;
+  color: #999;
+}
+
+/* 信息列表 */
+.info-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px;
+  background: #f9f9f9;
+  border-radius: 8px;
 }
 
 /* 弹窗底部 */
@@ -790,25 +1437,27 @@ const formatDate = (date: Date | string) => {
   gap: 10px;
   padding: 15px 20px;
   border-top: 1px solid #eee;
+  background: #f9f9f9;
 }
 
 .modal-footer button {
   flex: 1;
-  padding: 12px;
+  padding: 14px;
   border: none;
-  border-radius: 8px;
-  font-size: 14px;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 600;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all 0.2s;
 }
 
 .rest-btn {
-  background: #28a745;
+  background: #52c41a;
   color: white;
 }
 
 .release-btn {
-  background: #dc3545;
+  background: #ff4d4f;
   color: white;
 }
 

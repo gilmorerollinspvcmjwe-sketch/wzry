@@ -1,285 +1,380 @@
-import { Hero } from '@/core/models/Hero';
-import type { HeroRole, Position } from '@/types';
+// 英雄熟练度系统服务
 
-// 英雄熟练度等级
-export interface HeroMasteryLevel {
-  level: number;
-  name: string;
-  minMastery: number;
-  bonus: number;
-  color: string;
+/**
+ * 英雄熟练度等级
+ */
+export type MasteryLevel = '见习' | '熟练' | '精通' | '宗师' | '传说';
+
+/**
+ * 选手 - 英雄熟练度数据（统一数据模型）
+ */
+export interface PlayerHeroMastery {
+  playerId: string;
+  heroId: string;
+  heroName: string;          // 英雄名称
+  masteryPoints: number;     // 熟练度点数
+  level: MasteryLevel;       // 熟练度等级
+  gamesPlayed: number;       // 使用该英雄的比赛场数
+  wins: number;              // 胜场
+  winRate: number;           // 胜率 (0-100)
+  avgKDA: number;            // 平均 KDA
+  mvpCount: number;          // MVP 次数
+  lastPlayedAt?: Date;      // 最后使用时间
 }
 
-// 英雄熟练度等级定义
-export const MASTERY_LEVELS: HeroMasteryLevel[] = [
-  { level: 0, name: '未入门', minMastery: 0, bonus: 0, color: '#9e9e9e' },
-  { level: 1, name: '见习', minMastery: 10, bonus: 2, color: '#8bc34a' },
-  { level: 2, name: '熟练', minMastery: 25, bonus: 5, color: '#4caf50' },
-  { level: 3, name: '精通', minMastery: 45, bonus: 8, color: '#2196f3' },
-  { level: 4, name: '宗师', minMastery: 70, bonus: 12, color: '#9c27b0' },
-  { level: 5, name: '传说', minMastery: 90, bonus: 15, color: '#ff9800' },
-];
+/**
+ * 熟练度等级配置
+ */
+const MASTERY_CONFIG: Record<MasteryLevel, { minPoints: number; maxPoints: number; bonus: number }> = {
+  '见习': { minPoints: 0, maxPoints: 100, bonus: 0 },
+  '熟练': { minPoints: 100, maxPoints: 300, bonus: 0.03 },
+  '精通': { minPoints: 300, maxPoints: 600, bonus: 0.06 },
+  '宗师': { minPoints: 600, maxPoints: 1000, bonus: 0.09 },
+  '传说': { minPoints: 1000, maxPoints: 99999, bonus: 0.12 }
+};
 
-// 版本更新记录
-export interface VersionUpdate {
-  version: string;
-  date: Date;
-  buffs: string[]; // 增强的英雄ID
-  nerfs: string[]; // 削弱的英雄ID
-  adjustments: string[]; // 调整的英雄ID
-}
+/**
+ * 熟练度存储（玩家 - 英雄映射）
+ */
+class HeroMasteryStore {
+  private masteryMap: Map<string, PlayerHeroMastery> = new Map();
 
-// 英雄池分析结果
-export interface HeroPoolAnalysis {
-  totalHeroes: number;
-  averageMastery: number;
-  roleCoverage: Record<HeroRole, number>;
-  positionCoverage: Record<Position, number>;
-  topHeroes: { heroId: string; mastery: number }[];
-  weaknesses: string[];
-}
-
-// 英雄系统服务
-export class HeroSystem {
-  private heroes: Map<string, Hero> = new Map();
-  private versionHistory: VersionUpdate[] = [];
-  private currentVersion: string = '1.0.0';
-
-  // 初始化英雄系统
-  initialize(heroes: Hero[]): void {
-    this.heroes.clear();
-    heroes.forEach(hero => {
-      this.heroes.set(hero.id, hero);
-    });
+  /**
+   * 生成唯一键
+   */
+  private generateKey(playerId: string, heroId: string): string {
+    return `${playerId}_${heroId}`;
   }
 
-  // 获取英雄
-  getHero(heroId: string): Hero | undefined {
-    return this.heroes.get(heroId);
-  }
-
-  // 获取所有英雄
-  getAllHeroes(): Hero[] {
-    return Array.from(this.heroes.values());
-  }
-
-  // 根据定位获取英雄
-  getHeroesByRole(role: HeroRole): Hero[] {
-    return this.getAllHeroes().filter(h => h.role === role);
-  }
-
-  // 根据位置获取英雄
-  getHeroesByPosition(position: Position): Hero[] {
-    return this.getAllHeroes().filter(h => h.viablePositions.includes(position));
-  }
-
-  // 获取版本强势英雄
-  getMetaHeroes(maxTier: number = 2): Hero[] {
-    return this.getAllHeroes()
-      .filter(h => h.tier <= maxTier)
-      .sort((a, b) => a.tier - b.tier);
-  }
-
-  // 获取英雄熟练度等级
-  getMasteryLevel(mastery: number): HeroMasteryLevel {
-    for (let i = MASTERY_LEVELS.length - 1; i >= 0; i--) {
-      if (mastery >= MASTERY_LEVELS[i].minMastery) {
-        return MASTERY_LEVELS[i];
-      }
+  /**
+   * 获取或创建熟练度数据
+   */
+  getOrCreate(playerId: string, heroId: string, heroName: string = ''): PlayerHeroMastery {
+    const key = this.generateKey(playerId, heroId);
+    if (!this.masteryMap.has(key)) {
+      this.masteryMap.set(key, {
+        playerId,
+        heroId,
+        heroName,
+        masteryPoints: 0,
+        level: '见习',
+        gamesPlayed: 0,
+        wins: 0,
+        winRate: 0,
+        avgKDA: 0,
+        mvpCount: 0,
+        lastPlayedAt: undefined
+      });
     }
-    return MASTERY_LEVELS[0];
+    return this.masteryMap.get(key)!;
   }
 
-  // 计算英雄熟练度加成
-  getMasteryBonus(mastery: number): number {
-    const level = this.getMasteryLevel(mastery);
-    return level.bonus;
+  /**
+   * 获取熟练度数据
+   */
+  get(playerId: string, heroId: string): PlayerHeroMastery | undefined {
+    const key = this.generateKey(playerId, heroId);
+    return this.masteryMap.get(key);
   }
 
-  // 计算使用英雄时的属性加成
-  calculateHeroBonus(playerStats: number, heroMastery: number): number {
-    const masteryBonus = this.getMasteryBonus(heroMastery);
-    return playerStats * (1 + masteryBonus / 100);
+  /**
+   * 更新熟练度数据
+   */
+  update(data: PlayerHeroMastery): void {
+    const key = this.generateKey(data.playerId, data.heroId);
+    this.masteryMap.set(key, data);
   }
 
-  // 计算英雄对战加成
-  calculateMatchupBonus(heroId: string, opponentHeroId: string): number {
-    const hero = this.getHero(heroId);
-    if (!hero) return 0;
-
-    // 克制关系加成
-    if (hero.counters.includes(opponentHeroId)) {
-      return 0.1; // 10% 加成
-    }
-    if (hero.counteredBy.includes(opponentHeroId)) {
-      return -0.1; // 10% 减成
-    }
-    return 0;
+  /**
+   * 获取选手的所有英雄熟练度
+   */
+  getByPlayer(playerId: string): PlayerHeroMastery[] {
+    return Array.from(this.masteryMap.values()).filter(m => m.playerId === playerId);
   }
 
-  // 版本更新
-  applyVersionUpdate(update: VersionUpdate): void {
-    this.versionHistory.push(update);
-    this.currentVersion = update.version;
+  /**
+   * 获取英雄的所有选手熟练度
+   */
+  getByHero(heroId: string): PlayerHeroMastery[] {
+    return Array.from(this.masteryMap.values()).filter(m => m.heroId === heroId);
+  }
 
-    // 应用增强
-    update.buffs.forEach(heroId => {
-      const hero = this.getHero(heroId);
-      if (hero && hero.tier > 0) {
-        hero.tier = (hero.tier - 1) as 0 | 1 | 2 | 3 | 4 | 5;
-        hero.versionStrength = this.calculateVersionStrength(hero.tier);
-      }
+  /**
+   * 序列化数据（用于存档）
+   */
+  serialize(): PlayerHeroMastery[] {
+    return Array.from(this.masteryMap.values());
+  }
+
+  /**
+   * 反序列化数据（加载存档）
+   */
+  deserialize(data: PlayerHeroMastery[]): void {
+    this.masteryMap.clear();
+    data.forEach(item => {
+      const key = this.generateKey(item.playerId, item.heroId);
+      this.masteryMap.set(key, item);
     });
-
-    // 应用削弱
-    update.nerfs.forEach(heroId => {
-      const hero = this.getHero(heroId);
-      if (hero && hero.tier < 5) {
-        hero.tier = (hero.tier + 1) as 0 | 1 | 2 | 3 | 4 | 5;
-        hero.versionStrength = this.calculateVersionStrength(hero.tier);
-      }
-    });
-  }
-
-  // 计算版本强度
-  private calculateVersionStrength(tier: number): number {
-    const baseStrength: Record<number, number> = {
-      0: 1.2,
-      1: 1.1,
-      2: 1.0,
-      3: 0.95,
-      4: 0.9,
-      5: 0.85,
-    };
-    return baseStrength[tier] || 1.0;
-  }
-
-  // 生成随机版本更新
-  generateRandomUpdate(): VersionUpdate {
-    const allHeroes = this.getAllHeroes();
-    const buffCount = Math.floor(Math.random() * 3) + 1;
-    const nerfCount = Math.floor(Math.random() * 3) + 1;
-
-    const shuffled = [...allHeroes].sort(() => Math.random() - 0.5);
-    const buffs = shuffled.slice(0, buffCount).map(h => h.id);
-    const nerfs = shuffled.slice(buffCount, buffCount + nerfCount).map(h => h.id);
-
-    // 递增版本号
-    const versionParts = this.currentVersion.split('.').map(Number);
-    versionParts[2]++;
-    if (versionParts[2] > 9) {
-      versionParts[2] = 0;
-      versionParts[1]++;
-    }
-    if (versionParts[1] > 9) {
-      versionParts[1] = 0;
-      versionParts[0]++;
-    }
-
-    return {
-      version: versionParts.join('.'),
-      date: new Date(),
-      buffs,
-      nerfs,
-      adjustments: [],
-    };
-  }
-
-  // 分析英雄池
-  analyzeHeroPool(heroMasteries: Map<string, number>): HeroPoolAnalysis {
-    const entries = Array.from(heroMasteries.entries());
-    const totalHeroes = entries.length;
-    const averageMastery = totalHeroes > 0
-      ? entries.reduce((sum, [, m]) => sum + m, 0) / totalHeroes
-      : 0;
-
-    // 定位覆盖
-    const roleCoverage: Record<HeroRole, number> = {
-      tank: 0,
-      fighter: 0,
-      assassin: 0,
-      mage: 0,
-      marksman: 0,
-      support: 0,
-    };
-
-    // 位置覆盖
-    const positionCoverage: Record<Position, number> = {
-      top: 0,
-      jungle: 0,
-      mid: 0,
-      adc: 0,
-      support: 0,
-    };
-
-    entries.forEach(([heroId, mastery]) => {
-      const hero = this.getHero(heroId);
-      if (hero) {
-        roleCoverage[hero.role] += mastery;
-        hero.viablePositions.forEach(pos => {
-          positionCoverage[pos] += mastery;
-        });
-      }
-    });
-
-    // 获取熟练度最高的英雄
-    const topHeroes = entries
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 5)
-      .map(([heroId, mastery]) => ({ heroId, mastery }));
-
-    // 识别弱点
-    const weaknesses: string[] = [];
-    (Object.keys(roleCoverage) as HeroRole[]).forEach(role => {
-      if (roleCoverage[role] < 50) {
-        weaknesses.push(`${role}定位英雄熟练度不足`);
-      }
-    });
-    (Object.keys(positionCoverage) as Position[]).forEach(pos => {
-      if (positionCoverage[pos] < 50) {
-        weaknesses.push(`${pos}位置英雄熟练度不足`);
-      }
-    });
-
-    return {
-      totalHeroes,
-      averageMastery,
-      roleCoverage,
-      positionCoverage,
-      topHeroes,
-      weaknesses,
-    };
-  }
-
-  // 推荐适合位置的英雄
-  recommendHeroesForPosition(
-    position: Position,
-    heroMasteries: Map<string, number>,
-    limit: number = 5
-  ): { hero: Hero; mastery: number; score: number }[] {
-    const heroes = this.getHeroesByPosition(position);
-
-    return heroes
-      .map(hero => {
-        const mastery = heroMasteries.get(hero.id) || 0;
-        // 综合评分 = 英雄强度 * 0.4 + 熟练度 * 0.6
-        const score = hero.getPower() * 0.4 + mastery * 0.6;
-        return { hero, mastery, score };
-      })
-      .sort((a, b) => b.score - a.score)
-      .slice(0, limit);
-  }
-
-  // 获取当前版本
-  getCurrentVersion(): string {
-    return this.currentVersion;
-  }
-
-  // 获取版本历史
-  getVersionHistory(): VersionUpdate[] {
-    return this.versionHistory;
   }
 }
 
-// 创建单例实例
-export const heroSystem = new HeroSystem();
+// 单例实例
+const heroMasteryStore = new HeroMasteryStore();
+
+/**
+ * 获取熟练度等级
+ */
+export function getMasteryLevel(points: number): MasteryLevel {
+  if (points >= 1000) return '传说';
+  if (points >= 600) return '宗师';
+  if (points >= 300) return '精通';
+  if (points >= 100) return '熟练';
+  return '见习';
+}
+
+/**
+ * 获取熟练度加成（0-15%）
+ */
+export function getMasteryBonus(points: number): number {
+  const level = getMasteryLevel(points);
+  return MASTERY_CONFIG[level].bonus;
+}
+
+/**
+ * 获取当前等级的进度
+ */
+export function getMasteryProgress(points: number): { current: number; max: number; percentage: number } {
+  const level = getMasteryLevel(points);
+  const config = MASTERY_CONFIG[level];
+  const current = points - config.minPoints;
+  const max = config.maxPoints - config.minPoints;
+  return {
+    current,
+    max,
+    percentage: Math.min(100, (current / max) * 100)
+  };
+}
+
+/**
+ * 计算比赛后获得的熟练度
+ */
+export function calculateMasteryGain(
+  isWin: boolean,
+  isMVP: boolean,
+  gameDuration: number
+): number {
+  // 基础熟练度：20 点
+  let gain = 20;
+  
+  // 胜利加成：+50%
+  if (isWin) {
+    gain *= 1.5;
+  }
+  
+  // MVP 加成：+50%
+  if (isMVP) {
+    gain *= 1.5;
+  }
+  
+  // 时长加成：每分钟 +1 点，最多 +20 点
+  const durationBonus = Math.min(20, Math.floor(gameDuration / 1));
+  gain += durationBonus;
+  
+  return Math.floor(gain);
+}
+
+/**
+ * 更新选手英雄熟练度
+ */
+export function updatePlayerHeroMastery(
+  playerId: string,
+  heroId: string,
+  heroName: string,
+  isWin: boolean,
+  isMVP: boolean,
+  gameDuration: number
+): PlayerHeroMastery {
+  const mastery = heroMasteryStore.getOrCreate(playerId, heroId, heroName);
+  
+  // 增加熟练度点数
+  const gain = calculateMasteryGain(isWin, isMVP, gameDuration);
+  mastery.masteryPoints += gain;
+  mastery.level = getMasteryLevel(mastery.masteryPoints);
+  
+  // 更新统计
+  mastery.heroName = heroName;
+  mastery.gamesPlayed += 1;
+  if (isWin) {
+    mastery.wins += 1;
+  }
+  mastery.winRate = Math.round((mastery.wins / mastery.gamesPlayed) * 100);
+  if (isMVP) {
+    mastery.mvpCount += 1;
+  }
+  mastery.lastPlayedAt = new Date();
+  
+  // 保存
+  heroMasteryStore.update(mastery);
+  
+  return mastery;
+}
+
+/**
+ * 统一更新选手英雄数据（熟练度 + 使用统计）
+ */
+export function updatePlayerHeroData(
+  playerId: string,
+  heroId: string,
+  heroName: string,
+  isWin: boolean,
+  isMVP: boolean,
+  gameDuration: number,
+  kda: { kills: number; deaths: number; assists: number }
+): PlayerHeroMastery {
+  const mastery = heroMasteryStore.getOrCreate(playerId, heroId, heroName);
+  
+  // 更新英雄名称
+  mastery.heroName = heroName;
+  
+  // 增加熟练度点数
+  const gain = calculateMasteryGain(isWin, isMVP, gameDuration);
+  mastery.masteryPoints += gain;
+  mastery.level = getMasteryLevel(mastery.masteryPoints);
+  
+  // 更新使用统计
+  mastery.gamesPlayed += 1;
+  if (isWin) {
+    mastery.wins += 1;
+  }
+  mastery.winRate = Math.round((mastery.wins / mastery.gamesPlayed) * 100);
+  
+  // 更新平均 KDA
+  const currentKDA = (kda.kills + kda.assists) / Math.max(1, kda.deaths);
+  if (mastery.gamesPlayed === 1) {
+    mastery.avgKDA = Math.round(currentKDA * 100) / 100;
+  } else {
+    const totalKDA = mastery.avgKDA * (mastery.gamesPlayed - 1) + currentKDA;
+    mastery.avgKDA = Math.round((totalKDA / mastery.gamesPlayed) * 100) / 100;
+  }
+  
+  if (isMVP) {
+    mastery.mvpCount += 1;
+  }
+  mastery.lastPlayedAt = new Date();
+  
+  // 保存
+  heroMasteryStore.update(mastery);
+  
+  return mastery;
+}
+
+/**
+ * 获取选手对某个英雄的熟练度加成
+ */
+export function getPlayerHeroBonus(playerId: string, heroId: string): number {
+  const mastery = heroMasteryStore.get(playerId, heroId);
+  if (!mastery) return 0;
+  return getMasteryBonus(mastery.masteryPoints);
+}
+
+/**
+ * 获取选手的常用英雄列表
+ */
+export function getPlayerFavoriteHeroes(playerId: string, limit: number = 5): PlayerHeroMastery[] {
+  return heroMasteryStore
+    .getByPlayer(playerId)
+    .sort((a, b) => b.masteryPoints - a.masteryPoints)
+    .slice(0, limit);
+}
+
+/**
+ * 获取选手的英雄池深度（不同熟练度等级的英雄数量）
+ */
+export function getHeroPoolDepth(playerId: string): {
+  total: number;
+  master: number;     // 精通及以上
+  expert: number;     // 宗师及以上
+  legend: number;     // 传说
+} {
+  const masteries = heroMasteryStore.getByPlayer(playerId);
+  return {
+    total: masteries.length,
+    master: masteries.filter(m => m.level === '精通' || m.level === '宗师' || m.level === '传说').length,
+    expert: masteries.filter(m => m.level === '宗师' || m.level === '传说').length,
+    legend: masteries.filter(m => m.level === '传说').length
+  };
+}
+
+/**
+ * 训练英雄（消耗时间/资金提升熟练度）
+ */
+export function trainHero(
+  playerId: string,
+  heroId: string,
+  trainingType: 'basic' | 'advanced' | 'intensive'
+): { cost: number; time: number; masteryGain: number } {
+  const config = {
+    'basic': { cost: 1, time: 1, gain: 10 },      // 基础训练：1 万/1 天/+10 熟练度
+    'advanced': { cost: 5, time: 2, gain: 25 },   // 进阶训练：5 万/2 天/+25 熟练度
+    'intensive': { cost: 10, time: 3, gain: 50 }  // 强化训练：10 万/3 天/+50 熟练度
+  };
+  
+  const training = config[trainingType];
+  const mastery = heroMasteryStore.getOrCreate(playerId, heroId);
+  
+  mastery.masteryPoints += training.gain;
+  mastery.level = getMasteryLevel(mastery.masteryPoints);
+  heroMasteryStore.update(mastery);
+  
+  return {
+    cost: training.cost,
+    time: training.time,
+    masteryGain: training.gain
+  };
+}
+
+/**
+ * 导出所有熟练度数据（用于存档）
+ */
+export function exportMasteryData(): PlayerHeroMastery[] {
+  return heroMasteryStore.serialize();
+}
+
+/**
+ * 导入熟练度数据（加载存档）
+ */
+export function importMasteryData(data: PlayerHeroMastery[]): void {
+  heroMasteryStore.deserialize(data);
+}
+
+/**
+ * 获取选手的所有英雄数据（按场次排序）
+ */
+export function getPlayerAllHeroes(playerId: string): PlayerHeroMastery[] {
+  return heroMasteryStore
+    .getByPlayer(playerId)
+    .sort((a, b) => b.gamesPlayed - a.gamesPlayed);
+}
+
+/**
+ * 获取选手对某个英雄的数据
+ */
+export function getPlayerHeroData(playerId: string, heroId: string): PlayerHeroMastery | undefined {
+  return heroMasteryStore.get(playerId, heroId);
+}
+
+/**
+ * 获取选手最常用的英雄列表
+ */
+export function getPlayerMostUsedHeroes(playerId: string, limit: number = 5): PlayerHeroMastery[] {
+  return getPlayerAllHeroes(playerId).slice(0, limit);
+}
+
+/**
+ * 检查选手是否擅长某个英雄（根据使用场次和胜率）
+ */
+export function isPlayerGoodAtHero(playerId: string, heroId: string): boolean {
+  const stat = getPlayerHeroData(playerId, heroId);
+  if (!stat) return false;
+  return stat.gamesPlayed >= 5 && stat.winRate >= 55;
+}

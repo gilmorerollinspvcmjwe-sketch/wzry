@@ -33,14 +33,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref } from 'vue';
 import { Swiper, SwiperSlide } from 'swiper/vue';
 import { Pagination } from 'swiper/modules';
 import { useGameStore } from '@/stores/game';
 import { useClubStore } from '@/stores/club';
 import { useLeagueStore } from '@/stores/league';
 import { useFanReputationStore } from '@/stores/fanReputation';
-import { useSponsorStore } from '@/stores/sponsor';
 
 import TeamCard from '@/components/TeamCard.vue';
 import ScheduleCard from '@/components/ScheduleCard.vue';
@@ -49,18 +48,24 @@ import TodoList from '@/components/TodoList.vue';
 import DailyReport from '@/components/DailyReport.vue';
 import type { Todo } from '@/components/TodoList.vue';
 
-import 'swiper/css';
-import 'swiper/css/pagination';
+// Swiper CSS imports removed
 
 const gameStore = useGameStore();
 const clubStore = useClubStore();
 const leagueStore = useLeagueStore();
 const fanReputationStore = useFanReputationStore();
-const sponsorStore = useSponsorStore();
 
 // 日报弹窗
 const showDailyReport = ref(false);
-const dailyReport = ref({
+const dailyReport = ref<{
+  day: number;
+  date: string;
+  matchResult: { opponent: string; homeScore: number; awayScore: number; won: boolean } | undefined;
+  finance: { income: number; expense: number; net: number };
+  fans: { change: number; total: number };
+  playerUpdates: { name: string; message: string }[];
+  todos: { message: string; priority: 'low' | 'medium' | 'high' }[];
+}>({
   day: 1,
   date: new Date().toLocaleDateString('zh-CN'),
   matchResult: undefined,
@@ -146,7 +151,7 @@ const generateDailyReport = () => {
   // 选手状态更新
   dailyReport.value.playerUpdates = club.roster.slice(0, 3).map(p => ({
     name: p.name,
-    message: `体力恢复至 ${Math.min(100, p.stamina + 5)}%`,
+    message: `体力恢复至 ${Math.min(100, (p.condition?.stamina || 0) + 5)}%`,
   }));
 
   // 待处理事项
