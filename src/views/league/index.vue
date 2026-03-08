@@ -4,11 +4,15 @@ import { useLeagueStore } from '@/stores/league';
 import { useClubStore } from '@/stores/club';
 import { useLeagueStatisticsStore } from '@/stores/leagueStatistics';
 import { useHistoricalDataStore } from '@/stores/historicalData';
+import { useAIStore } from '@/stores/ai';
+import { inferManagementStyle, getManagementStyleName, getManagementStyleIcon } from '@/utils/aiStyleMapper';
+import type { LeaderboardType } from '@/types/statistics';
 
 const leagueStore = useLeagueStore();
 const clubStore = useClubStore();
 const statisticsStore = useLeagueStatisticsStore();
 const historicalDataStore = useHistoricalDataStore();
+const aiStore = useAIStore();
 
 const activeTab = ref<'overview' | 'standings' | 'schedule' | 'statistics' | 'history'>('overview');
 
@@ -17,8 +21,7 @@ onMounted(() => {
   historicalDataStore.initialize();
 });
 
-// 排行榜类型
-const leaderboardTypes = [
+const leaderboardTypes: { value: LeaderboardType; label: string; unit: string }[] = [
   { value: 'kills', label: '击杀', unit: '' },
   { value: 'assists', label: '助攻', unit: '' },
   { value: 'kda', label: 'KDA', unit: '' },
@@ -27,9 +30,9 @@ const leaderboardTypes = [
   { value: 'mvp_count', label: 'MVP', unit: '次' },
 ];
 
-const selectedLeaderboard = ref('kda');
+const selectedLeaderboard = ref<LeaderboardType>('kda');
 const currentLeaderboard = computed(() => {
-  return statisticsStore.getLeaderboard(selectedLeaderboard.value as any, 10);
+  return statisticsStore.getLeaderboard(selectedLeaderboard.value, 10);
 });
 
 // 统计数据
@@ -55,7 +58,7 @@ const heroStats = computed(() => statisticsStore.heroStats);
 const champions = computed(() => historicalDataStore.champions);
 const records = computed(() => historicalDataStore.records);
 
-// 选手位置映射
+// 位置名称映射
 const positionNames: Record<string, string> = {
   top: '对抗路',
   jungle: '打野',
@@ -63,6 +66,21 @@ const positionNames: Record<string, string> = {
   adc: '发育路',
   support: '游走',
 };
+
+// 获取俱乐部的 AI 经营风格
+function getClubAIStyle(clubId: string) {
+  // 如果是玩家俱乐部，返回 null
+  if (clubId === clubStore.currentClub?.id) {
+    return null;
+  }
+  
+  const profile = aiStore.getAIProfile(clubId);
+  if (!profile) return null;
+  
+  // 从 AI personality 推断经营风格
+  const { aggressiveness, patience, riskTolerance } = profile.personality;
+  return inferManagementStyle(aggressiveness, patience, riskTolerance);
+}
 
 // 当前赛季信息
 const currentSeason = computed(() => leagueStore.currentSeason);
@@ -286,7 +304,17 @@ const myMatches = computed(() => leagueStore.myClubMatches);
             :class="{ 'is-me': team.clubId === clubStore.currentClub?.id }"
           >
             <span class="col-rank">{{ team.rank }}</span>
-            <span class="col-name">{{ team.clubName }}</span>
+            <span class="col-name">
+              {{ team.clubName }}
+              <span 
+                v-if="getClubAIStyle(team.clubId)" 
+                class="ai-style-tag"
+                :class="getClubAIStyle(team.clubId)"
+              >
+                <span class="ai-style-icon">{{ getManagementStyleIcon(getClubAIStyle(team.clubId)!) }}</span>
+                <span class="ai-style-name">{{ getManagementStyleName(getClubAIStyle(team.clubId)!) }}</span>
+              </span>
+            </span>
             <span class="col-played">{{ team.played }}</span>
             <span class="col-won">{{ team.won }}</span>
             <span class="col-lost">{{ team.lost }}</span>
@@ -1122,5 +1150,68 @@ const myMatches = computed(() => leagueStore.myClubMatches);
 .record-date {
   font-size: 11px;
   color: #999;
+}
+
+/* AI 经营风格标签 */
+.ai-style-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: bold;
+  white-space: nowrap;
+  margin-left: 6px;
+}
+
+.ai-style-tag.big-spender {
+  background: #FFD700;
+  color: #8B4513;
+}
+
+.ai-style-tag.youth-focused {
+  background: #4CAF50;
+  color: #FFFFFF;
+}
+
+.ai-style-tag.stable {
+  background: #2196F3;
+  color: #FFFFFF;
+}
+
+.ai-style-tag.gambler {
+  background: #F44336;
+  color: #FFFFFF;
+}
+
+.ai-style-tag.low-profile {
+  background: #9E9E9E;
+  color: #FFFFFF;
+}
+
+.ai-style-icon {
+  font-size: 12px;
+}
+
+.ai-style-name {
+  line-height: 1.2;
+}
+
+/* 响应式适配 */
+@media (max-width: 768px) {
+  .ai-style-tag {
+    padding: 2px 6px;
+    font-size: 10px;
+    margin-left: 4px;
+  }
+
+  .ai-style-icon {
+    font-size: 11px;
+  }
+
+  .ai-style-name {
+    display: none; /* 移动端只显示图标 */
+  }
 }
 </style>

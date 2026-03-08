@@ -31,7 +31,7 @@
             <div class="player-stats">
               <div class="stat-row">
                 <span class="stat-label">实力</span>
-                <span class="stat-value">{{ (player as any).getTotalPower?.() || 0 }}</span>
+                <span class="stat-value">{{ getPlayerPower(player) }}</span>
               </div>
               <div class="stat-row">
                 <span class="stat-label">体力</span>
@@ -106,6 +106,8 @@ import { ref, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { useClubStore } from '@/stores/club';
 import { usePlayerStore } from '@/stores/player';
+import { RouteNames } from '@/constants/routes';
+import { getPlayerTotalPower } from '@/utils/playerUtils';
 
 const router = useRouter();
 const clubStore = useClubStore();
@@ -119,7 +121,6 @@ const tabs = [
 
 const activeTab = ref('roster');
 
-// 阵容数据
 const mainRoster = computed(() => {
   return clubStore.currentClub?.roster.slice(0, 5) || [];
 });
@@ -128,21 +129,23 @@ const benchCount = computed(() => {
   return Math.max(0, (clubStore.currentClub?.roster.length || 0) - 5);
 });
 
-// 推荐选手（模拟数据）
 const recommendedPlayers = ref([
   { id: '1', name: '张天才', price: 200, reason: '高潜力新秀' },
   { id: '2', name: '李强', price: 350, reason: '即战力补强' },
   { id: '3', name: '王明星', price: 500, reason: '明星选手' },
 ]);
 
-// 青训选手
 const youthPlayers = computed(() => {
   return playerStore.youthPlayers.slice(0, 3);
 });
 
+const getPlayerPower = (player: any): number => {
+  return getPlayerTotalPower(player);
+};
+
 const viewPlayerDetail = (player: any) => {
-  // 查看选手详情
-  console.log('查看选手:', player);
+  // 跳转到团队管理页面并传递选手 ID
+  router.push({ name: RouteNames.Team, query: { playerId: player.id } });
 };
 
 const viewTransferDetail = (_player: any) => {
@@ -154,12 +157,10 @@ const goToTransfer = () => {
 };
 
 const promoteYouth = (player: any) => {
-  // 提拔青训选手
   console.log('提拔:', player);
 };
 
 const scoutYouth = () => {
-  // 挖掘新选手
   const player = playerStore.generateYouthPlayer();
   if (player) {
     alert(`发现青训选手：${player.name}，潜力${player.potential}`);

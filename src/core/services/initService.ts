@@ -4,6 +4,7 @@ import { useMatchStore } from '@/stores/match';
 import { useSponsorStore } from '@/stores/sponsor';
 import { useFanReputationStore } from '@/stores/fanReputation';
 import { Player } from '@/core/models/Player';
+import { AIService } from './aiService';
 import type { Position } from '@/types';
 
 // AI 俱乐部名称列表
@@ -23,6 +24,15 @@ const aiClubNames = [
   '佛山 DRG',
   '厦门 VG',
 ];
+
+// AI 模板列表
+const aiTemplates = ['aggressive', 'balanced', 'conservative', 'gambler', 'developer'];
+
+// 为俱乐部生成随机 AI 模板
+function getRandomAITemplate(): string {
+  const template = aiTemplates[Math.floor(Math.random() * aiTemplates.length)];
+  return template || 'balanced';
+}
 
 // 生成随机选手
 function generateRandomPlayer(position: string, ageRange: [number, number], minPotential: number): Player {
@@ -106,13 +116,23 @@ export class InitService {
       });
       console.log('AI 俱乐部生成完成，总数:', clubStore.clubs.length);
 
-      // 为AI俱乐部生成初始阵容
+      // 为 AI 俱乐部生成初始阵容
       clubStore.clubs.forEach(club => {
         if (club.id !== clubStore.currentClub?.id && club.roster.length === 0) {
           generateInitialRoster(club, false);
         }
       });
-      console.log('AI俱乐部初始阵容生成完成');
+      console.log('AI 俱乐部初始阵容生成完成');
+
+      // 为每个 AI 俱乐部初始化 AI Profile
+      clubStore.clubs.forEach(club => {
+        if (club.id !== clubStore.currentClub?.id) {
+          const template = getRandomAITemplate();
+          AIService.initAIClub(club.id, template);
+          console.log(`AI 俱乐部 ${club.name} 初始化 AI Profile: ${template}`);
+        }
+      });
+      console.log('AI 俱乐部 AI Profile 初始化完成');
 
       // 初始化英雄系统 - 简化版无需初始化
       console.log('英雄系统初始化完成');

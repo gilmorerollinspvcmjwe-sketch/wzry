@@ -317,6 +317,18 @@ export const useFanReputationStore = defineStore('fanReputation', {
       this._updateActiveFans();
     },
 
+    // 增加粉丝数量（商业活动等场景使用）
+    addFans(amount: number) {
+      if (!this.fanBase) return;
+      this.fanBase.totalFans = Math.max(0, this.fanBase.totalFans + amount);
+      this._updateActiveFans();
+    },
+
+    // 增加声望值
+    addReputation(amount: number) {
+      this.reputationValue = Math.max(0, this.reputationValue + amount);
+    },
+
     // 设置忠诚度
     setLoyalty(loyalty: number) {
       if (!this.fanBase) return;

@@ -5,6 +5,9 @@ import { AI_TEMPLATES } from '@/types/ai';
 import type { Club } from '@/core/models/Club';
 import type { Player } from '@/core/models/Player';
 import type { Position, PlayerStats } from '@/types';
+import { aiNewsGenerator } from './aiNewsGenerator';
+import { getDifficultyCoefficients } from './difficultyConfig';
+import { useGameStore } from '@/stores/game';
 
 export class AIService {
   private static aiProfiles: Map<string, AIProfile> = new Map();
@@ -99,6 +102,11 @@ export class AIService {
     const ai = this.getAIProfile(club.id);
     if (!ai) return { type: 'none', reason: 'No AI profile' };
 
+    // Task 9: 应用难度系数
+    const gameStore = useGameStore();
+    const difficulty = gameStore.settings?.difficulty || 'normal';
+    const coeffs = getDifficultyCoefficients(difficulty);
+
     // 评估所有位置需求
     const positions: Position[] = ['top', 'jungle', 'mid', 'adc', 'support'];
     const needs = positions.map(pos => ({
@@ -132,13 +140,15 @@ export class AIService {
       e.ratio = e.value / (e.price || 1);
     });
 
-    // 选择性价比最高的
-    const maxBudget = club.funds * (ai.personality.riskTolerance / 100);
+    // 选择性价比最高的（应用难度系数到预算）
+    const maxBudget = club.funds * (ai.personality.riskTolerance / 100) * coeffs.budgetMultiplier;
     const best = evaluated
       .filter(e => e.price <= maxBudget)
       .sort((a, b) => b.ratio - a.ratio)[0];
 
-    if (best && Math.random() < 0.7) {
+    // 应用难度系数到决策概率
+    const decisionProbability = 0.7 * coeffs.decisionAccuracy;
+    if (best && Math.random() < decisionProbability) {
       return {
         type: 'bid',
         playerId: best.player.id,
@@ -152,8 +162,14 @@ export class AIService {
 
   // 训练决策
   static makeTrainingDecision(player: Player, ai: AIProfile): AITrainingDecision {
-    // 体力不足时休息
-    if (player.condition.stamina < 30) {
+    // Task 9: 应用难度系数
+    const gameStore = useGameStore();
+    const difficulty = gameStore.settings?.difficulty || 'normal';
+    const coeffs = getDifficultyCoefficients(difficulty);
+
+    // 体力不足时休息（应用难度系数到体力阈值）
+    const staminaThreshold = 30 * coeffs.trainingEffectiveness;
+    if (player.condition.stamina < staminaThreshold) {
       return {
         type: 'rest',
         playerId: player.id,
@@ -165,9 +181,12 @@ export class AIService {
     let stat: keyof PlayerStats;
     let intensity: 'low' | 'medium' | 'high';
 
+    // 应用难度系数到决策质量
+    const adjustedPatience = ai.personality.patience * coeffs.decisionAccuracy;
+
     if (ai.strategy.trainingFocus === 'balanced') {
       // 年轻选手练操作，老将练意识
-      if (player.age < 22) {
+      if (player.age < 22 && adjustedPatience > 50) {
         stat = 'mechanics';
         intensity = 'high';
       } else if (player.age > 26) {
@@ -193,22 +212,31 @@ export class AIService {
 
   // 比赛战术决策
   static selectTactics(myClub: Club, opponent: Club, ai: AIProfile): AITactics {
+    const gameStore = useGameStore();
+    const difficulty = gameStore.settings?.difficulty || 'normal';
+    const coeffs = getDifficultyCoefficients(difficulty);
+
     const myPower = myClub.getTotalPower();
     const oppPower = opponent.getTotalPower();
+
+    // 应用难度系数调整AI战术选择
+    const adjustedMyPower = myPower * coeffs.tacticsVariety;
+    const adjustedOppPower = oppPower;
 
     let style: 'aggressive' | 'defensive' | 'balanced';
     let focus: 'early_game' | 'mid_game' | 'late_game' | 'balanced';
 
-    // 实力对比决定基调
-    if (myPower > oppPower * 1.2) {
+    // 实力对比决定基调（使用调整后的实力值）
+    if (adjustedMyPower > adjustedOppPower * 1.2) {
       style = 'aggressive';
       focus = 'early_game';
-    } else if (myPower < oppPower * 0.8) {
+    } else if (adjustedMyPower < adjustedOppPower * 0.8) {
       style = 'defensive';
       focus = 'late_game';
     } else {
-      // 实力相当，根据AI性格
-      style = ai.personality.aggressiveness > 60 ? 'aggressive' : 'balanced';
+      // 实力相当，根据AI性格和难度调整
+      const aggressivenessThreshold = 60 / coeffs.decisionAccuracy;
+      style = ai.personality.aggressiveness > aggressivenessThreshold ? 'aggressive' : 'balanced';
       focus = 'mid_game';
     }
 
@@ -220,7 +248,7 @@ export class AIService {
   }
 
   // 模拟AI一周行为
-  static simulateAIWeek(club: Club, availablePlayers: Player[]): void {
+  static simulateAIWeek(club: Club, availablePlayers: any[]): void {
     const ai = this.getAIProfile(club.id);
     if (!ai) return;
 
@@ -229,9 +257,13 @@ export class AIService {
       const decision = this.makeTrainingDecision(player, ai);
       if (decision.type === 'train' && decision.stat) {
         // 执行训练
-        player.train(decision.stat, decision.intensity === 'high' ? 2 : 1);
+        if (typeof player.train === 'function') {
+          player.train(decision.stat, decision.intensity === 'high' ? 2 : 1);
+        }
       } else if (decision.type === 'rest') {
-        player.recover();
+        if (typeof player.recover === 'function') {
+          player.recover();
+        }
       }
     });
 
@@ -242,6 +274,12 @@ export class AIService {
       if (decision.type === 'bid' && decision.playerId) {
         // 这里需要调用转会逻辑
         console.log(`AI ${club.name} wants to bid for player ${decision.playerId}`);
+
+        // 生成 AI 转会新闻
+        const player = availablePlayers.find(p => p.id === decision.playerId);
+        if (player) {
+          aiNewsGenerator.generateTransferNews(club, player, decision.price || 0);
+        }
       }
     }
   }

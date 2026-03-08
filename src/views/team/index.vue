@@ -1,25 +1,54 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, ref, onMounted, watch } from 'vue';
+import { useRoute } from 'vue-router';
 import { useClubStore } from '@/stores/club';
 import { usePlayerStore } from '@/stores/player';
 import { useHeroStore } from '@/stores/hero';
+import { usePlayerPersonalityStore } from '@/stores/playerPersonality';
 import { Player } from '@/core/models/Player';
 import type { PlayerStats } from '@/types';
+import { getPlayerTotalPower, getPlayerHeroStatsList, recoverPlayer } from '@/utils/playerUtils';
+import PlayerEmotion from '@/components/PlayerEmotion.vue';
+import PlayerDialogue from '@/components/PlayerDialogue.vue';
+import PlayerDemands from '@/components/PlayerDemands.vue';
+import RelationshipNetwork from '@/components/RelationshipNetwork.vue';
+import StoryEvent from '@/components/StoryEvent.vue';
+import EndorsementManager from '@/components/EndorsementManager.vue';
 
+const route = useRoute();
 const clubStore = useClubStore();
 const playerStore = usePlayerStore();
 const heroStore = useHeroStore();
+const personalityStore = usePlayerPersonalityStore();
 
 const activeTab = ref<'roster' | 'youth'>('roster');
 const selectedPlayer = ref<Player | null>(null);
 const showPlayerDetail = ref(false);
-const playerDetailTab = ref<'stats' | 'heroes' | 'data'>('stats');
+const playerDetailTab = ref<'stats' | 'heroes' | 'data' | 'personality' | 'dialogue' | 'relationship' | 'story' | 'commercial'>('stats');
 
-// 当前阵容
 const roster = computed(() => clubStore.fixedRoster);
 const youthTeam = computed(() => clubStore.fixedYouthTeam);
 
-// 位置名称映射
+// 检查 URL 参数，自动打开选手详情
+const checkPlayerIdParam = () => {
+  const playerId = route.query.playerId as string;
+  if (playerId) {
+    const player = roster.value.find(p => p.id === playerId) || youthTeam.value.find(p => p.id === playerId);
+    if (player) {
+      openPlayerDetail(player);
+    }
+  }
+};
+
+onMounted(() => {
+  checkPlayerIdParam();
+});
+
+// 监听路由参数变化
+watch(() => route.query.playerId, () => {
+  checkPlayerIdParam();
+});
+
 const positionNames: Record<string, string> = {
   top: '对抗路',
   jungle: '打野',
@@ -28,7 +57,6 @@ const positionNames: Record<string, string> = {
   support: '游走',
 };
 
-// 属性名称映射
 const statNames: Record<keyof PlayerStats, string> = {
   mechanics: '操作',
   awareness: '意识',
@@ -37,7 +65,6 @@ const statNames: Record<keyof PlayerStats, string> = {
   heroPool: '英雄池',
 };
 
-// 性格名称映射
 const personalityNames: Record<string, string> = {
   trainingAttitude: '训练态度',
   playStyle: '比赛风格',
@@ -64,20 +91,17 @@ const personalityValueNames: Record<string, string> = {
   charismatic: '魅力型',
 };
 
-// 打开选手详情
 const openPlayerDetail = (player: any) => {
   selectedPlayer.value = player as Player;
   showPlayerDetail.value = true;
   playerDetailTab.value = 'stats';
 };
 
-// 关闭选手详情
 const closePlayerDetail = () => {
   showPlayerDetail.value = false;
   selectedPlayer.value = null;
 };
 
-// 训练选手
 const trainPlayer = (player: any, statType: keyof PlayerStats) => {
   const success = playerStore.trainPlayer(player.id, statType);
   if (success) {
@@ -87,13 +111,11 @@ const trainPlayer = (player: any, statType: keyof PlayerStats) => {
   }
 };
 
-// 休息恢复
 const restPlayer = (player: any) => {
-  (player as any).recover?.();
+  recoverPlayer(player);
   alert(`${player.name} 已休息恢复`);
 };
 
-// 提拔青训选手
 const promoteYouth = (player: any) => {
   const success = clubStore.promoteYouthPlayer(player.id);
   if (success) {
@@ -145,9 +167,8 @@ const getHeroRole = (heroId: string): string => {
   return hero ? heroStore.getRoleName(hero.role) : '';
 };
 
-// 获取选手英雄使用统计
 const getPlayerHeroStats = (player: any) => {
-  return (player as any).getHeroStatsList?.() || [];
+  return getPlayerHeroStatsList(player);
 };
 
 // 获取选手英雄偏好
@@ -165,9 +186,12 @@ const getPlayerTalents = (player: any) => {
   return player.talents || [];
 };
 
-// 获取选手生涯数据
 const getPlayerCareerStats = (player: any) => {
   return player.careerStats || { totalMatches: 0, wins: 0, losses: 0, winRate: 0, mvpCount: 0, averageKDA: 0 };
+};
+
+const getPlayerPower = (player: any): number => {
+  return getPlayerTotalPower(player);
 };
 </script>
 
@@ -215,10 +239,10 @@ const getPlayerCareerStats = (player: any) => {
             <div class="stat-bar">
               <div 
                 class="stat-fill" 
-                :style="{ width: (player as any).getTotalPower?.() + '%' }"
+                :style="{ width: getPlayerPower(player) + '%' }"
               ></div>
             </div>
-            <span class="stat-value">{{ (player as any).getTotalPower?.() || 0 }}</span>
+            <span class="stat-value">{{ getPlayerPower(player) }}</span>
           </div>
           <div class="stat-row">
             <span class="stat-label">体力</span>
@@ -283,10 +307,10 @@ const getPlayerCareerStats = (player: any) => {
             <div class="stat-bar">
               <div 
                 class="stat-fill" 
-                :style="{ width: (player as any).getTotalPower?.() + '%' }"
+                :style="{ width: getPlayerPower(player) + '%' }"
               ></div>
             </div>
-            <span class="stat-value">{{ (player as any).getTotalPower?.() || 0 }}</span>
+            <span class="stat-value">{{ getPlayerPower(player) }}</span>
           </div>
         </div>
         
@@ -350,6 +374,41 @@ const getPlayerCareerStats = (player: any) => {
           >
             数据
           </button>
+          <button 
+            class="detail-tab"
+            :class="{ active: playerDetailTab === 'personality' }"
+            @click="playerDetailTab = 'personality'"
+          >
+            个性
+          </button>
+          <button 
+            class="detail-tab"
+            :class="{ active: playerDetailTab === 'dialogue' }"
+            @click="playerDetailTab = 'dialogue'"
+          >
+            对话
+          </button>
+          <button 
+            class="detail-tab"
+            :class="{ active: playerDetailTab === 'relationship' }"
+            @click="playerDetailTab = 'relationship'"
+          >
+            关系
+          </button>
+          <button 
+            class="detail-tab"
+            :class="{ active: playerDetailTab === 'story' }"
+            @click="playerDetailTab = 'story'"
+          >
+            故事
+          </button>
+          <button 
+            class="detail-tab"
+            :class="{ active: playerDetailTab === 'commercial' }"
+            @click="playerDetailTab = 'commercial'"
+          >
+            商业
+          </button>
         </div>
         
         <div class="modal-body">
@@ -365,7 +424,7 @@ const getPlayerCareerStats = (player: any) => {
                 </div>
                 <div class="info-item">
                   <span class="info-label">总实力</span>
-                  <span class="info-value highlight">{{ (selectedPlayer as any).getTotalPower?.() || 0 }}</span>
+                  <span class="info-value highlight">{{ getPlayerPower(selectedPlayer) }}</span>
                 </div>
                 <div class="info-item">
                   <span class="info-label">周薪</span>
@@ -608,6 +667,64 @@ const getPlayerCareerStats = (player: any) => {
                   <span class="info-value">{{ formatDate(selectedPlayer.contract.endDate) }}</span>
                 </div>
               </div>
+            </div>
+          </div>
+
+          <!-- 个性标签页 -->
+          <div v-else-if="playerDetailTab === 'personality'" class="tab-content personality-tab">
+            <PlayerEmotion 
+              :player-id="selectedPlayer.id" 
+              :show-details="true"
+            />
+            
+            <div class="personality-sections">
+              <div class="section-card">
+                <PlayerDemands 
+                  :player-id="selectedPlayer.id"
+                  @demand-processed="(id, satisfied) => console.log('Demand processed:', id, satisfied)"
+                />
+              </div>
+              
+              <div class="section-card">
+                <PlayerDialogue :player-id="selectedPlayer.id" />
+              </div>
+            </div>
+          </div>
+
+          <!-- 对话标签页 -->
+          <div v-else-if="playerDetailTab === 'dialogue'" class="tab-content dialogue-tab">
+            <div class="dialogue-container">
+              <PlayerDialogue :player-id="selectedPlayer.id" />
+            </div>
+          </div>
+
+          <!-- 关系标签页 -->
+          <div v-else-if="playerDetailTab === 'relationship'" class="tab-content relationship-tab">
+            <div class="relationship-container">
+              <RelationshipNetwork :club-id="clubStore.currentClub?.id || ''" />
+            </div>
+          </div>
+
+          <!-- 故事标签页 -->
+          <div v-else-if="playerDetailTab === 'story'" class="tab-content story-tab">
+            <div class="story-container">
+              <h4>选手故事线</h4>
+              <div class="story-placeholder">
+                <p>{{ selectedPlayer.name }} 的故事正在书写中...</p>
+                <p class="story-hint">随着比赛和训练，故事将逐步展开</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- 商业标签页 -->
+          <div v-else-if="playerDetailTab === 'commercial'" class="tab-content commercial-tab">
+            <div class="commercial-container">
+              <EndorsementManager 
+                :player-id="selectedPlayer.id"
+                :endorsements="selectedPlayer.endorsements || []"
+                @complete="handleEndorsementComplete"
+                @terminate="handleEndorsementTerminate"
+              />
             </div>
           </div>
         </div>
@@ -1431,6 +1548,67 @@ h4 {
   border-radius: 8px;
 }
 
+ .personality-tab {
+  padding: 0;
+}
+
+.personality-tab {
+  padding: 16px;
+}
+
+.dialogue-tab {
+  padding: 16px;
+}
+
+.dialogue-container {
+  min-height: 200px;
+}
+
+.relationship-tab {
+  padding: 16px;
+}
+
+.relationship-container {
+  min-height: 300px;
+}
+
+.story-tab {
+  padding: 16px;
+}
+
+.story-container {
+  min-height: 200px;
+}
+
+.story-container h4 {
+  margin: 0 0 16px 0;
+  font-size: 15px;
+  color: #333;
+}
+
+.story-placeholder {
+  text-align: center;
+  padding: 40px;
+  color: #999;
+}
+
+.story-placeholder p {
+  margin: 5px 0;
+}
+
+.story-hint {
+  font-size: 12px;
+  color: #666;
+}
+
+.commercial-tab {
+  padding: 16px;
+}
+
+.commercial-container {
+  min-height: 200px;
+}
+
 /* 弹窗底部 */
 .modal-footer {
   display: flex;
@@ -1464,5 +1642,23 @@ h4 {
 .promote-btn {
   background: #007bff;
   color: white;
+}
+
+/* 个性标签页样式 */
+.personality-tab {
+  padding: 0;
+}
+
+.personality-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.section-card {
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
 }
 </style>

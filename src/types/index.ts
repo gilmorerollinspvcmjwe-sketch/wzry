@@ -199,3 +199,18 @@ export interface StrategyInfo {
   earlyGame: number;
   lateGame: number;
 }
+
+export * from './aiPersonality';
+export * from './homeVenue';
+export * from './youthAcademy';
+export * from './finance';
+export * from './version';
+export * from './transferWindow';
+export * from './storyline';
+export * from './retirement';
+export * from './commercial';
+export * from './coach';
+export * from './tactics';
+export * from './relationship';
+export * from './leagueEcosystem';
+export * from './matchVisualization';

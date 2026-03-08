@@ -2,24 +2,38 @@
 import { ref, computed, watch, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useClubStore } from '@/stores/club';
+import { useMatchStore } from '@/stores/match';
 import { BattleReportService } from '@/core/services/battleReportService';
+import { RouteNames } from '@/constants/routes';
 import type { BattleReport, PlayerPerformance } from '@/types/battleReport';
 
 const route = useRoute();
 const router = useRouter();
 const clubStore = useClubStore();
+const matchStore = useMatchStore();
 
 // 获取路由参数
 const homeClubId = route.query.home as string;
 const awayClubId = route.query.away as string;
+const matchId = route.query.matchId as string;
 
 // 直接从 store 的 clubs 数组中查找俱乐部
 const homeClub = computed(() => clubStore.clubs.find(c => c.id === homeClubId));
 const awayClub = computed(() => clubStore.clubs.find(c => c.id === awayClubId));
 
+// 获取比赛结果（如果有）
+const matchResult = computed(() => {
+  if (matchId) {
+    return matchStore.getMatchResult(matchId);
+  }
+  return null;
+});
+
 // 生成战报
 const report = ref<BattleReport | null>(null);
 const winner = ref<'home' | 'away'>('home');
+const homeScore = ref(0);
+const awayScore = ref(0);
 const playerPerformances = ref<PlayerPerformance[]>([]);
 const isLoading = ref(true);
 
@@ -31,26 +45,42 @@ const generateReport = () => {
   }
   
   try {
-    // 模拟比赛结果
-    const homePower = (homeClub.value as any).getTotalPower?.() || 0;
-    const awayPower = (awayClub.value as any).getTotalPower?.() || 0;
-    const homeAdvantage = 5;
-    const homeRoll = homePower + homeAdvantage + Math.random() * 20;
-    const awayRoll = awayPower + Math.random() * 20;
-    
-    winner.value = homeRoll > awayRoll ? 'home' : 'away';
+    // 优先使用已存在的比赛结果
+    if (matchResult.value) {
+      winner.value = matchResult.value.winner === homeClubId ? 'home' : 'away';
+      homeScore.value = matchResult.value.homeScore;
+      awayScore.value = matchResult.value.awayScore;
+    } else {
+      // 模拟比赛结果
+      const homePower = homeClub.value.getTotalPower?.() || 0;
+      const awayPower = awayClub.value.getTotalPower?.() || 0;
+      const homeAdvantage = 5;
+      const homeRoll = homePower + homeAdvantage + Math.random() * 20;
+      const awayRoll = awayPower + Math.random() * 20;
+      
+      winner.value = homeRoll > awayRoll ? 'home' : 'away';
+      
+      // 生成比分
+      if (winner.value === 'home') {
+        homeScore.value = 3;
+        awayScore.value = Math.floor(Math.random() * 2) + 1; // 1-2
+      } else {
+        awayScore.value = 3;
+        homeScore.value = Math.floor(Math.random() * 2) + 1; // 1-2
+      }
+    }
     
     // 生成战报
     report.value = BattleReportService.generateBattleReport(
-      homeClub.value as any,
-      awayClub.value as any,
+      homeClub.value,
+      awayClub.value,
       winner.value
     );
     
     // 生成选手表现
     playerPerformances.value = BattleReportService.generatePlayerPerformances(
-      homeClub.value as any,
-      awayClub.value as any
+      homeClub.value,
+      awayClub.value
     );
   } catch (error) {
     console.error('生成战报失败:', error);
@@ -111,9 +141,9 @@ const getEventTypeName = (type: string) => {
   return names[type] || type;
 };
 
-// 返回上一页
+// 返回比赛列表页
 const goBack = () => {
-  router.back();
+  router.push({ name: RouteNames.Match });
 };
 </script>
 
@@ -144,12 +174,12 @@ const goBack = () => {
         <div class="teams-display">
           <div class="team home" :class="{ winner: winner === 'home' }">
             <div class="team-name">{{ homeClub?.name }}</div>
-            <div class="team-score">{{ winner === 'home' ? '3' : '1' }}</div>
+            <div class="team-score">{{ homeScore }}</div>
           </div>
           <div class="vs-divider">VS</div>
           <div class="team away" :class="{ winner: winner === 'away' }">
             <div class="team-name">{{ awayClub?.name }}</div>
-            <div class="team-score">{{ winner === 'away' ? '3' : '1' }}</div>
+            <div class="team-score">{{ awayScore }}</div>
           </div>
         </div>
         <div class="match-info">

@@ -5,6 +5,13 @@ import { useClubStore } from '@/stores/club';
 import { useMatchStore } from '@/stores/match';
 import { useGameStore } from '@/stores/game';
 import type { Match } from '@/core/models/Match';
+import type { MatchVisualization, PlayerLiveStats } from '@/types/matchVisualization';
+import { getClubTotalPower } from '@/utils/clubUtils';
+import { generateMatchVisualization } from '@/core/services/matchVisualizationService';
+import MatchMinimap from '@/components/MatchMinimap.vue';
+import GoldCurve from '@/components/GoldCurve.vue';
+import MatchDataPanel from '@/components/MatchDataPanel.vue';
+import PostMatchAnalysis from '@/components/PostMatchAnalysis.vue';
 
 const router = useRouter();
 
@@ -17,27 +24,24 @@ const showMatchDetail = ref(false);
 const selectedMatch = ref<Match | null>(null);
 const showSimulateResult = ref(false);
 const simulateResult = ref<{ winner: string; homeScore: number; awayScore: number } | null>(null);
+const showVisualization = ref(false);
+const visualizationData = ref<MatchVisualization | null>(null);
+const visualizationTab = ref<'minimap' | 'gold' | 'stats' | 'analysis'>('minimap');
+const currentTimestamp = ref(0);
+const selectedPlayer = ref<PlayerLiveStats | null>(null);
 
-// 下一场比赛
 const nextMatch = computed(() => matchStore.nextMatch);
-
-// 即将进行的比赛
 const upcomingMatches = computed(() => matchStore.upcomingMatches);
-
-// 历史比赛
 const matchHistory = computed(() => matchStore.matchHistory);
 
-// 获取俱乐部名称
 const getClubName = (clubId: string) => {
   const club = clubStore.getClub(clubId);
   return club?.name || '未知俱乐部';
 };
 
-// 获取俱乐部实力
 const getClubPower = (clubId: string) => {
   const club = clubStore.getClub(clubId);
-  // 使用类型断言访问方法（Pinia持久化后方法会丢失）
-  return (club as any)?.getTotalPower?.() || 0;
+  return getClubTotalPower(club);
 };
 
 // 打开比赛详情
@@ -136,6 +140,29 @@ const getResultText = (match: Match) => {
   const isHome = match.homeTeam.clubId === clubStore.currentClub?.id;
   const won = isHome ? match.result === 'win' : match.result === 'loss';
   return won ? '胜利' : '失败';
+};
+
+// 查看比赛可视化
+const viewVisualization = (match: Match) => {
+  visualizationData.value = generateMatchVisualization(match);
+  currentTimestamp.value = 0;
+  showVisualization.value = true;
+};
+
+// 关闭可视化
+const closeVisualization = () => {
+  showVisualization.value = false;
+  visualizationData.value = null;
+};
+
+// 处理时间戳变化
+const handleTimestampChange = (timestamp: number) => {
+  currentTimestamp.value = timestamp;
+};
+
+// 处理选手选择
+const handlePlayerSelect = (player: PlayerLiveStats) => {
+  selectedPlayer.value = player;
 };
 </script>
 
@@ -252,6 +279,9 @@ const getResultText = (match: Match) => {
           </div>
           <button class="report-btn" @click.stop="viewBattleReport(match)">
             📋 战报
+          </button>
+          <button class="report-btn visualization" @click.stop="viewVisualization(match)">
+            📊 可视化
           </button>
         </div>
       </div>
@@ -393,6 +423,56 @@ const getResultText = (match: Match) => {
           <button class="confirm-btn" @click="showSimulateResult = false">
             确定
           </button>
+        </div>
+      </div>
+    </div>
+    
+    <!-- 比赛可视化弹窗 -->
+    <div v-if="showVisualization && visualizationData" class="modal-overlay visualization-modal" @click="closeVisualization">
+      <div class="visualization-content" @click.stop>
+        <div class="visualization-header">
+          <h3>比赛可视化分析</h3>
+          <button class="close-btn" @click="closeVisualization">×</button>
+        </div>
+        
+        <div class="visualization-tabs">
+          <button
+            v-for="tab in visualizationTabs"
+            :key="tab.id"
+            :class="['vis-tab-btn', { active: visualizationTab === tab.id }]"
+            @click="visualizationTab = tab.id"
+          >
+            {{ tab.label }}
+          </button>
+        </div>
+        
+        <div class="visualization-body">
+          <div v-if="visualizationTab === 'minimap'" class="vis-panel">
+            <MatchMinimap
+              :minimap-data="visualizationData.minimap"
+              :duration="visualizationData.duration"
+              @timestamp-change="handleTimestampChange"
+              @player-select="handlePlayerSelect"
+            />
+          </div>
+          
+          <div v-else-if="visualizationTab === 'gold'" class="vis-panel">
+            <GoldCurve :gold-curve="visualizationData.goldCurve" />
+          </div>
+          
+          <div v-else-if="visualizationTab === 'stats'" class="vis-panel">
+            <MatchDataPanel
+              :live-stats="visualizationData.liveStats"
+              :current-timestamp="currentTimestamp"
+              :blue-team-name="getClubName(selectedMatch?.homeTeam.clubId || '')"
+              :red-team-name="getClubName(selectedMatch?.awayTeam.clubId || '')"
+              @player-select="handlePlayerSelect"
+            />
+          </div>
+          
+          <div v-else-if="visualizationTab === 'analysis'" class="vis-panel">
+            <PostMatchAnalysis :analysis="visualizationData.postMatch" />
+          </div>
         </div>
       </div>
     </div>

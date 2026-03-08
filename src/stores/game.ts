@@ -5,6 +5,9 @@ import { usePlayerStore } from './player';
 import { useSponsorStore } from './sponsor';
 import { useFanReputationStore } from './fanReputation';
 import { useEventStore } from './event';
+import { useMediaStore } from './media';
+import { useAIStore } from './ai';
+import { AIService } from '@/core/services/aiService';
 
 interface GameSettings {
   difficulty: Difficulty;
@@ -93,6 +96,7 @@ export const useGameStore = defineStore('game', {
     initializeSystems() {
       const sponsorStore = useSponsorStore();
       const fanReputationStore = useFanReputationStore();
+      const mediaStore = useMediaStore();
 
       // 初始化英雄系统 - 简化版无需初始化
 
@@ -101,6 +105,9 @@ export const useGameStore = defineStore('game', {
 
       // 初始化粉丝声望系统
       fanReputationStore.initialize(10000, 30);
+
+      // 初始化媒体系统
+      mediaStore.initialize();
     },
     
     // 推进时间
@@ -170,12 +177,16 @@ export const useGameStore = defineStore('game', {
       const playerStore = usePlayerStore();
       const sponsorStore = useSponsorStore();
       const fanReputationStore = useFanReputationStore();
+      const mediaStore = useMediaStore();
 
       // 获取当前俱乐部数据
       const club = clubStore.currentClub;
       if (!club) return;
 
-      // 1. 处理赞助商周结算
+      // 1. AI 俱乐部周模拟
+      this.simulateAIClubs();
+
+      // 2. 处理赞助商周结算
       const currentRanking = 10;
       const winRate = 0.5;
 
@@ -191,7 +202,7 @@ export const useGameStore = defineStore('game', {
         clubStore.addFunds(sponsorResult.income + sponsorResult.bonus);
       }
 
-      // 2. 处理粉丝与声望周增长
+      // 3. 处理粉丝与声望周增长
       const fanResult = fanReputationStore.processWeeklyGrowth(
         this.currentWeek,
         currentRanking,
@@ -207,14 +218,17 @@ export const useGameStore = defineStore('game', {
       club.fans = fanReputationStore.totalFans;
       club.reputation = fanReputationStore.reputation;
 
-      // 3. 检查版本更新 - 简化版暂不实现
+      // 4. 媒体系统周更新
+      mediaStore.onWeekAdvance();
 
-      // 4. 选手恢复体力
+      // 5. 检查版本更新 - 简化版暂不实现
+
+      // 6. 选手恢复体力
       club.roster.forEach(player => {
         playerStore.recoverPlayer(player.id);
       });
 
-      // 5. 生成周报
+      // 7. 生成周报
       this.weeklyReport = {
         week: this.currentWeek,
         fanChange: fanResult.fanChange,
@@ -227,6 +241,50 @@ export const useGameStore = defineStore('game', {
       };
 
       console.log('Week passed:', this.currentWeek, 'Report:', this.weeklyReport);
+    },
+    
+    // AI 俱乐部周模拟
+    simulateAIClubs() {
+      const clubStore = useClubStore();
+      const playerStore = usePlayerStore();
+      const aiStore = useAIStore();
+
+      // 获取所有 AI 俱乐部（排除玩家俱乐部）
+      const allClubs = clubStore.allClubs;
+      const playerClubId = clubStore.currentClub?.id;
+
+      if (!playerClubId) return;
+
+      // 获取所有可用选手（自由球员 + 青训）
+      const availablePlayers = playerStore.availablePlayers;
+
+      // 遍历所有 AI 俱乐部
+      allClubs.forEach(club => {
+        if (club.id === playerClubId) return; // 跳过玩家俱乐部
+
+        // 初始化 AI 配置（如果还没有）
+        if (!AIService.getAIProfile(club.id)) {
+          // 优先从 store 恢复
+          const storedProfile = aiStore.getAIProfile(club.id);
+          if (storedProfile && storedProfile.template) {
+            AIService.initAIClub(club.id, storedProfile.template);
+          } else {
+            AIService.initAIClub(club.id);
+          }
+        }
+
+        // 执行 AI 周模拟（使用类型断言处理 Pinia 持久化后的对象）
+        const clubWithMethods = club as any;
+        if (clubWithMethods.roster) {
+          AIService.simulateAIWeek(clubWithMethods, availablePlayers);
+        }
+
+        // 更新 AI Profile 到 store（持久化）
+        const updatedProfile = AIService.getAIProfile(club.id);
+        if (updatedProfile) {
+          aiStore.setAIProfile(club.id, updatedProfile);
+        }
+      });
     },
     
     // 检查随机事件已在上面定义

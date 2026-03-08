@@ -6,19 +6,34 @@
       <div class="menu-group">
         <h3 class="group-title">俱乐部管理</h3>
         <div class="menu-items">
-          <div class="menu-item" @click="goTo('/game/sponsor')">
+          <div class="menu-item" @click="goTo(RouteNames.Sponsor)">
             <span class="icon">🤝</span>
             <span class="label">赞助商</span>
             <span class="arrow">›</span>
           </div>
-          <div class="menu-item" @click="goTo('/game/fans')">
-            <span class="icon">❤️</span>
-            <span class="label">粉丝与声望</span>
+          <div class="menu-item" @click="goTo(RouteNames.Coach)">
+            <span class="icon">👔</span>
+            <span class="label">教练团队</span>
             <span class="arrow">›</span>
           </div>
-          <div class="menu-item" @click="goTo('/game/settings')">
-            <span class="icon">⚙️</span>
-            <span class="label">设置</span>
+          <div class="menu-item" @click="goTo(RouteNames.Venue)">
+            <span class="icon">🏟️</span>
+            <span class="label">主场管理</span>
+            <span class="arrow">›</span>
+          </div>
+          <div class="menu-item" @click="goTo(RouteNames.Finance)">
+            <span class="icon">💰</span>
+            <span class="label">财务中心</span>
+            <span class="arrow">›</span>
+          </div>
+          <div class="menu-item" @click="goTo(RouteNames.Community)">
+            <span class="icon">👥</span>
+            <span class="label">粉丝社区</span>
+            <span class="arrow">›</span>
+          </div>
+          <div class="menu-item" @click="goTo(RouteNames.Youth)">
+            <span class="icon">🌱</span>
+            <span class="label">青训系统</span>
             <span class="arrow">›</span>
           </div>
         </div>
@@ -27,29 +42,92 @@
       <div class="menu-group">
         <h3 class="group-title">数据中心</h3>
         <div class="menu-items">
-          <div class="menu-item" @click="goTo('/game/league')">
+          <div class="menu-item" @click="goTo(RouteNames.League)">
             <span class="icon">🏅</span>
             <span class="label">联赛详情</span>
             <span class="arrow">›</span>
           </div>
-          <div class="menu-item" @click="goTo('/game/transfer')">
+          <div class="menu-item" @click="goTo(RouteNames.Transfer)">
             <span class="icon">🔄</span>
             <span class="label">转会市场</span>
             <span class="arrow">›</span>
           </div>
-          <div class="menu-item" @click="goTo('/game/heroes')">
+          <div class="menu-item" @click="goTo(RouteNames.Heroes)">
             <span class="icon">🎮</span>
             <span class="label">英雄图鉴</span>
             <span class="arrow">›</span>
           </div>
-          <div class="menu-item" @click="goTo('/game/achievements')">
+          <div class="menu-item" @click="goTo(RouteNames.Achievements)">
             <span class="icon">🏆</span>
             <span class="label">成就系统</span>
             <span class="arrow">›</span>
           </div>
-          <div class="menu-item" @click="goTo('/game/objectives')">
+          <div class="menu-item" @click="goTo(RouteNames.Objectives)">
             <span class="icon">🎯</span>
             <span class="label">赛季目标</span>
+            <span class="arrow">›</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="menu-group">
+        <h3 class="group-title">媒体与社交</h3>
+        <div class="menu-items">
+          <div class="menu-item" @click="goTo(RouteNames.Media)">
+            <span class="icon">📰</span>
+            <span class="label">媒体中心</span>
+            <span class="arrow">›</span>
+          </div>
+          <div class="menu-item" @click="goTo(RouteNames.News)">
+            <span class="icon">📋</span>
+            <span class="label">新闻动态</span>
+            <span class="arrow">›</span>
+          </div>
+          <div class="menu-item" @click="goTo(RouteNames.Interview)">
+            <span class="icon">🎤</span>
+            <span class="label">采访管理</span>
+            <span class="arrow">›</span>
+          </div>
+          <div class="menu-item" @click="goTo(RouteNames.Social)">
+            <span class="icon">📱</span>
+            <span class="label">社交媒体</span>
+            <span class="arrow">›</span>
+          </div>
+          <div class="menu-item" @click="goTo(RouteNames.Fans)">
+            <span class="icon">❤️</span>
+            <span class="label">粉丝与声望</span>
+            <span class="arrow">›</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="menu-group">
+        <h3 class="group-title">战术与比赛</h3>
+        <div class="menu-items">
+          <div class="menu-item" @click="goTo(RouteNames.Tactics)">
+            <span class="icon">📊</span>
+            <span class="label">战术配置</span>
+            <span class="arrow">›</span>
+          </div>
+          <div class="menu-item" @click="goTo(RouteNames.Events)">
+            <span class="icon">📅</span>
+            <span class="label">事件中心</span>
+            <span class="arrow">›</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="menu-group">
+        <h3 class="group-title">系统</h3>
+        <div class="menu-items">
+          <div class="menu-item" @click="goTo(RouteNames.Version)">
+            <span class="icon">📱</span>
+            <span class="label">版本更新</span>
+            <span class="arrow">›</span>
+          </div>
+          <div class="menu-item" @click="goTo(RouteNames.Settings)">
+            <span class="icon">⚙️</span>
+            <span class="label">设置</span>
             <span class="arrow">›</span>
           </div>
         </div>
@@ -60,11 +138,12 @@
 
 <script setup lang="ts">
 import { useRouter } from 'vue-router';
+import { RouteNames } from '@/constants/routes';
 
 const router = useRouter();
 
-const goTo = (path: string) => {
-  router.push(path);
+const goTo = (name: string) => {
+  router.push({ name });
 };
 </script>
 

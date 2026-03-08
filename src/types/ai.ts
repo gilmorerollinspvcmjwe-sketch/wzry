@@ -20,6 +20,7 @@ export interface AIStrategy {
 // AI完整配置
 export interface AIProfile {
   clubId: string;
+  template?: string;  // AI模板名称
   personality: AIPersonality;
   strategy: AIStrategy;
 }

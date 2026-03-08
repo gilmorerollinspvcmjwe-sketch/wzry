@@ -158,23 +158,23 @@
 <script setup lang="ts">
 import { computed, ref, onMounted } from 'vue';
 import { useFanReputationStore } from '@/stores/fanReputation';
+import { useEventStore } from '@/stores/event';
 
 const fanReputationStore = useFanReputationStore();
+const eventStore = useEventStore();
 const isReady = ref(false);
 
-// 确保store已初始化
 onMounted(() => {
   if (!fanReputationStore.initialized) {
     fanReputationStore.initialize();
   }
+  eventStore.refreshEvents();
   isReady.value = true;
 });
 
-// 声望等级
 const reputationLevel = computed(() => fanReputationStore.reputationLevel);
 const reputationLevels = computed(() => fanReputationStore.allReputationLevels);
 
-// 粉丝情绪
 const sentimentValue = computed(() => fanReputationStore.sentimentValue);
 const sentimentEmoji = computed(() => {
   const value = sentimentValue.value;
@@ -194,28 +194,48 @@ const sentimentColor = computed(() => {
   return '#dc3545';
 });
 
-// 活跃粉丝率
 const activeFanRate = computed(() => {
   const total = fanReputationStore.totalFans;
   return total > 0 ? fanReputationStore.activeFans / total : 0;
 });
 
-// 历史记录
 const history = computed(() => fanReputationStore.history);
 const maxFans = computed(() => {
   if (history.value.length === 0) return 1;
   return Math.max(...history.value.map(h => h.fans), fanReputationStore.totalFans);
 });
 
-// 周变化（模拟数据）
-const weeklyFanChange = ref(150);
+const weeklyFanChange = computed(() => {
+  if (history.value.length < 2) return 0;
+  const current = fanReputationStore.totalFans;
+  const previous = history.value[history.value.length - 2]?.fans || current;
+  return current - previous;
+});
 
-// 最近事件（模拟数据）
-const recentEvents = ref([
-  { icon: '🏆', description: '联赛获胜 vs AG超玩会', fanChange: 120, reputationChange: 0.5 },
-  { icon: '⭐', description: '签约明星选手', fanChange: 500, reputationChange: 2 },
-  { icon: '📈', description: '周粉丝自然增长', fanChange: 150, reputationChange: 0.1 },
-]);
+const recentEvents = computed(() => {
+  return eventStore.eventHistory.slice(-5).map(event => ({
+    icon: getEventIcon(event.category),
+    description: event.title,
+    fanChange: event.consequences?.fanChange || 0,
+    reputationChange: event.consequences?.reputationChange || 0,
+  }));
+});
+
+function getEventIcon(category: string): string {
+  const icons: Record<string, string> = {
+    business: '💼',
+    transfer: '🔄',
+    injury: '🏥',
+    internal: '👥',
+    media: '📺',
+    sponsor: '�',
+    competitor: '⚔️',
+    league_policy: '📋',
+    emergency: '🚨',
+    honor: '🏆',
+  };
+  return icons[category] || '📌';
+}
 </script>
 
 <style scoped>

@@ -21,7 +21,7 @@
     <NextDayButton @click="handleNextDay" />
 
     <!-- 待处理事项 -->
-    <TodoList :todos="todoList" @action="handleTodoAction" />
+    <TodoList :todos="todoStore.sortedTodos" @action="handleTodoAction" />
 
     <!-- 日报弹窗 -->
     <DailyReport
@@ -33,29 +33,31 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, onMounted } from 'vue';
 import { Swiper, SwiperSlide } from 'swiper/vue';
 import { Pagination } from 'swiper/modules';
 import { useGameStore } from '@/stores/game';
 import { useClubStore } from '@/stores/club';
 import { useLeagueStore } from '@/stores/league';
 import { useFanReputationStore } from '@/stores/fanReputation';
+import { useTodoStore, type Todo } from '@/stores/todo';
+import { useEventStore } from '@/stores/event';
+import { useInterviewStore } from '@/stores/interview';
 
 import TeamCard from '@/components/TeamCard.vue';
 import ScheduleCard from '@/components/ScheduleCard.vue';
 import NextDayButton from '@/components/NextDayButton.vue';
 import TodoList from '@/components/TodoList.vue';
 import DailyReport from '@/components/DailyReport.vue';
-import type { Todo } from '@/components/TodoList.vue';
-
-// Swiper CSS imports removed
 
 const gameStore = useGameStore();
 const clubStore = useClubStore();
 const leagueStore = useLeagueStore();
 const fanReputationStore = useFanReputationStore();
+const todoStore = useTodoStore();
+const eventStore = useEventStore();
+const interviewStore = useInterviewStore();
 
-// 日报弹窗
 const showDailyReport = ref(false);
 const dailyReport = ref<{
   day: number;
@@ -75,87 +77,74 @@ const dailyReport = ref<{
   todos: [],
 });
 
-// 待处理事项
-const todoList = ref<Todo[]>([
-  {
-    id: '1',
-    type: 'sponsor',
-    priority: 'medium',
-    message: '赞助商合同还有15天到期',
-  },
-  {
-    id: '2',
-    type: 'player_contract',
-    priority: 'high',
-    message: '张三的合同即将到期（25天）',
-  },
-]);
+onMounted(() => {
+  todoStore.generateTodos();
+});
 
-// 处理下一天
 const handleNextDay = () => {
-  // 推进时间
   gameStore.advanceTime();
 
-  // 生成日报
+  eventStore.triggerDailyEvent();
+  interviewStore.triggerPostMatchInterview();
+
   generateDailyReport();
 
-  // 显示日报
   showDailyReport.value = true;
 
-  // 检查是否是周一，触发周结算
+  todoStore.generateTodos();
+
   const currentDate = gameStore.currentDate;
   if (currentDate.getDay() === 1) {
-    // 周一触发周结算
     handleWeeklySettlement();
   }
 };
 
-// 生成日报
 const generateDailyReport = () => {
   const club = clubStore.currentClub;
   if (!club) return;
 
-  // 检查今天是否有比赛
   const todayMatch = leagueStore.myClubMatches.find(m => {
     const matchDate = new Date(m.scheduledDate);
     return matchDate.toDateString() === gameStore.currentDate.toDateString() && !m.isFinished;
   });
 
-  // 模拟比赛结果（实际应该调用比赛系统）
-  if (todayMatch) {
+  if (todayMatch && todayMatch.result) {
+    const isHome = todayMatch.homeTeamId === club.id;
     dailyReport.value.matchResult = {
-      opponent: todayMatch.homeTeamId === club.id ? todayMatch.awayTeamName : todayMatch.homeTeamName,
-      homeScore: Math.floor(Math.random() * 3),
-      awayScore: Math.floor(Math.random() * 3),
-      won: Math.random() > 0.5,
+      opponent: isHome ? todayMatch.awayTeamName : todayMatch.homeTeamName,
+      homeScore: todayMatch.result.homeScore,
+      awayScore: todayMatch.result.awayScore,
+      won: isHome ? todayMatch.result.homeScore > todayMatch.result.awayScore : todayMatch.result.awayScore > todayMatch.result.homeScore,
     };
   } else {
     dailyReport.value.matchResult = undefined;
   }
 
-  // 资金变动
+  const baseIncome = club.funds > 0 ? Math.floor(club.funds * 0.01) : 0;
+  const baseExpense = club.roster.reduce((sum, p) => sum + (p.salary || 0), 0) / 7;
+  
   dailyReport.value.finance = {
-    income: Math.floor(Math.random() * 50) + 20,
-    expense: Math.floor(Math.random() * 30) + 10,
-    net: 0,
+    income: baseIncome,
+    expense: Math.floor(baseExpense),
+    net: baseIncome - Math.floor(baseExpense),
   };
-  dailyReport.value.finance.net = dailyReport.value.finance.income - dailyReport.value.finance.expense;
 
-  // 粉丝变化
-  const fanChange = Math.floor(Math.random() * 200) - 50;
+  const fanChange = eventStore.lastEventConsequences?.fans || 0;
   dailyReport.value.fans = {
     change: fanChange,
     total: fanReputationStore.totalFans + fanChange,
   };
 
-  // 选手状态更新
-  dailyReport.value.playerUpdates = club.roster.slice(0, 3).map(p => ({
-    name: p.name,
-    message: `体力恢复至 ${Math.min(100, (p.condition?.stamina || 0) + 5)}%`,
-  }));
+  dailyReport.value.playerUpdates = club.roster.slice(0, 3).map(p => {
+    const staminaRecovery = 5;
+    const newStamina = Math.min(100, (p.condition?.stamina || 0) + staminaRecovery);
+    return {
+      name: p.name,
+      message: `体力恢复至 ${newStamina}%`,
+    };
+  });
 
-  // 待处理事项
-  dailyReport.value.todos = todoList.value.map(t => ({
+  dailyReport.value.todos = todoStore.sortedTodos.slice(0, 5).map(t => ({
     message: t.message,
     priority: t.priority,
   }));
@@ -164,17 +153,13 @@ const generateDailyReport = () => {
   dailyReport.value.date = gameStore.currentDate.toLocaleDateString('zh-CN');
 };
 
-// 周结算
 const handleWeeklySettlement = () => {
-  // 触发各种周结算逻辑
   console.log('周结算触发');
 };
 
-// 处理待处理事项
 const handleTodoAction = (todo: Todo) => {
   console.log('处理事项:', todo);
-  // 从列表中移除
-  todoList.value = todoList.value.filter(t => t.id !== todo.id);
+  todoStore.removeTodo(todo.id);
 };
 </script>
 

@@ -20,7 +20,7 @@ const filteredAchievements = computed(() => {
   return achievementStore.achievements.filter(a => a.category === selectedCategory.value);
 });
 
-const categories = [
+const categories: { value: AchievementCategory | 'all'; label: string }[] = [
   { value: 'all', label: '全部' },
   { value: 'career', label: '职业生涯' },
   { value: 'competition', label: '比赛竞技' },
@@ -72,7 +72,7 @@ function goBack() {
         :key="cat.value"
         class="category-tab"
         :class="{ active: selectedCategory === cat.value }"
-        @click="selectedCategory = cat.value as any"
+        @click="selectedCategory = cat.value"
       >
         {{ cat.label }}
       </button>

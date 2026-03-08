@@ -1,21 +1,29 @@
 <script setup lang="ts">
-import { computed, ref, onMounted } from 'vue';
+import { computed, ref, onMounted, watch } from 'vue';
 import { useClubStore } from '@/stores/club';
 import { usePlayerStore } from '@/stores/player';
 import { useGameStore } from '@/stores/game';
+import { useTransferWindowStore } from '@/stores/transferWindow';
 import { Player } from '@/core/models/Player';
 import type { Position, PlayerStats } from '@/types';
+import type { TransferNegotiation as TransferNegotiationType } from '@/types/transferWindow';
+import { getPlayerTotalPower } from '@/utils/playerUtils';
+import TransferBidding from '@/components/TransferBidding.vue';
+import TransferNegotiationPanel from '@/components/TransferNegotiation.vue';
 
 const clubStore = useClubStore();
 const playerStore = usePlayerStore();
 const gameStore = useGameStore();
+const transferWindowStore = useTransferWindowStore();
 
-const activeTab = ref<'market' | 'free' | 'youth'>('market');
+const activeTab = ref<'market' | 'bidding' | 'negotiations' | 'free' | 'youth'>('market');
 const selectedPlayer = ref<Player | null>(null);
 const showPlayerDetail = ref(false);
+const showBiddingPanel = ref(false);
+const showNegotiationPanel = ref(false);
+const selectedNegotiation = ref<TransferNegotiationType | null>(null);
 const positionFilter = ref<Position | 'all'>('all');
 
-// 位置名称映射
 const positionNames: Record<string, string> = {
   all: '全部',
   top: '对抗路',
@@ -25,7 +33,6 @@ const positionNames: Record<string, string> = {
   support: '游走',
 };
 
-// 属性名称映射
 const statNames: Record<keyof PlayerStats, string> = {
   mechanics: '操作',
   awareness: '意识',
@@ -34,16 +41,17 @@ const statNames: Record<keyof PlayerStats, string> = {
   heroPool: '英雄池',
 };
 
-// 转会市场选手（模拟其他俱乐部的选手）
+const getPlayerPower = (player: any): number => {
+  return getPlayerTotalPower(player);
+};
+
 const marketPlayers = computed(() => {
-  // 生成一些随机的可签约选手
   return playerStore.transferList.filter(p => {
     if (positionFilter.value === 'all') return true;
     return p.position === positionFilter.value;
   });
 });
 
-// 自由选手
 const freePlayers = computed(() => {
   return playerStore.availablePlayers.filter(p => {
     if (positionFilter.value === 'all') return true;
@@ -51,62 +59,101 @@ const freePlayers = computed(() => {
   });
 });
 
-// 当前资金
 const currentFunds = computed(() => clubStore.currentClub?.funds || 0);
 
-// 是否是转会期
 const isTransferWindow = computed(() => gameStore.isTransferWindow);
 
-// 打开选手详情
+const currentClubId = computed(() => clubStore.currentClub?.id || '');
+
+const myBids = computed(() => transferWindowStore.myBids);
+
+const myNegotiations = computed(() => transferWindowStore.myNegotiations);
+
+const pendingBidsCount = computed(() => transferWindowStore.pendingBidsCount);
+
+const activeNegotiationsCount = computed(() => transferWindowStore.activeNegotiationsCount);
+
+const windowStatus = computed(() => transferWindowStore.windowStatus);
+
+const daysRemaining = computed(() => transferWindowStore.daysRemaining);
+
 const openPlayerDetail = (player: any) => {
   selectedPlayer.value = player as Player;
   showPlayerDetail.value = true;
 };
 
-// 关闭选手详情
 const closePlayerDetail = () => {
   showPlayerDetail.value = false;
   selectedPlayer.value = null;
 };
 
-// 签约选手
+const openBiddingPanel = (player: any) => {
+  selectedPlayer.value = player as Player;
+  showPlayerDetail.value = false;
+  showBiddingPanel.value = true;
+};
+
+const closeBiddingPanel = () => {
+  showBiddingPanel.value = false;
+  selectedPlayer.value = null;
+};
+
+const openNegotiationPanel = (negotiation: TransferNegotiationType) => {
+  selectedNegotiation.value = negotiation;
+  showNegotiationPanel.value = true;
+};
+
+const closeNegotiationPanel = () => {
+  showNegotiationPanel.value = false;
+  selectedNegotiation.value = null;
+};
+
 const signPlayer = (player: any) => {
   if (!isTransferWindow.value) {
     alert('现在不是转会期，无法签约选手');
     return;
   }
   
-  const success = clubStore.signPlayer(player);
-  if (success) {
-    // 从转会列表移除
+  const result = clubStore.signPlayer(player);
+  if (result.success) {
     const index = playerStore.transferList.findIndex(p => p.id === player.id);
     if (index > -1) {
       playerStore.transferList.splice(index, 1);
     }
-    alert(`成功签约 ${player.name}！`);
+    if (result.message) {
+      alert(result.message);
+    } else {
+      alert(`成功签约 ${player.name}！`);
+    }
     closePlayerDetail();
   } else {
-    alert('资金不足，无法签约该选手');
+    let message = result.message || '资金不足，无法签约该选手';
+    if (result.competingClubs && result.competingClubs.length > 0) {
+      message += `\n参与竞价的俱乐部：${result.competingClubs.join('、')}`;
+    }
+    alert(message);
   }
 };
 
-// 生成青训选手
 const generateYouthPlayer = () => {
-  const cost = 50; // 挖掘青训选手费用
+  const cost = 50;
   if (currentFunds.value < cost) {
-    alert('资金不足，需要50万');
+    alert('资金不足，需要 50 万');
     return;
   }
   
-  if (confirm('花费50万挖掘一名青训选手？')) {
+  if (confirm('花费 50 万挖掘一名青训选手？')) {
     clubStore.spendFunds(cost);
     const player = playerStore.generateYouthPlayer();
-    clubStore.signPlayer(player, true);
-    alert(`发现青训选手：${player.name}`);
+    const result = clubStore.signPlayer(player, true);
+    if (result.message) {
+      alert(result.message);
+    } else {
+      alert(`发现青训选手：${player.name}`);
+    }
   }
 };
 
-// 刷新转会市场
 const refreshMarket = () => {
   const cost = 10;
   if (currentFunds.value < cost) {
@@ -116,7 +163,6 @@ const refreshMarket = () => {
   
   if (confirm('花费10万刷新转会市场？')) {
     clubStore.spendFunds(cost);
-    // 生成新的选手
     for (let i = 0; i < 3; i++) {
       const player = playerStore.generatePlayer([18, 28], [60, 90]);
       playerStore.transferList.push(player);
@@ -125,15 +171,76 @@ const refreshMarket = () => {
   }
 };
 
-// 初始化转会市场
+const initTransferWindow = () => {
+  const currentDate = gameStore.currentDate instanceof Date 
+    ? gameStore.currentDate 
+    : new Date(gameStore.currentDate);
+  const year = currentDate.getFullYear();
+  const month = currentDate.getMonth();
+  
+  const type = month >= 5 && month <= 7 ? 'summer' : 'winter';
+  
+  if (!transferWindowStore.currentWindow) {
+    transferWindowStore.initializeWindow(year, type);
+  }
+  
+  transferWindowStore.checkWindowStatus();
+  
+  if (currentClubId.value) {
+    transferWindowStore.refreshClubData(currentClubId.value);
+  }
+};
+
+const onBiddingSuccess = () => {
+  if (currentClubId.value) {
+    transferWindowStore.refreshClubData(currentClubId.value);
+  }
+};
+
+const onNegotiationCompleted = () => {
+  closeNegotiationPanel();
+  if (currentClubId.value) {
+    transferWindowStore.refreshClubData(currentClubId.value);
+  }
+};
+
+const getNegotiationStatusText = (status: string) => {
+  const map: Record<string, string> = {
+    pending: '待处理',
+    in_progress: '谈判中',
+    agreed: '已达成',
+    rejected: '已拒绝',
+    expired: '已过期',
+  };
+  return map[status] || status;
+};
+
+const getNegotiationStatusClass = (status: string) => {
+  const map: Record<string, string> = {
+    pending: 'pending',
+    in_progress: 'in-progress',
+    agreed: 'agreed',
+    rejected: 'rejected',
+    expired: 'expired',
+  };
+  return map[status] || '';
+};
+
+watch(currentClubId, (newId) => {
+  if (newId) {
+    transferWindowStore.refreshClubData(newId);
+  }
+});
+
 onMounted(() => {
-  // 如果转会市场为空，生成一些初始选手
   if (playerStore.transferList.length === 0) {
     for (let i = 0; i < 5; i++) {
       const player = playerStore.generatePlayer([18, 28], [60, 90]);
       playerStore.transferList.push(player);
     }
   }
+  
+  initTransferWindow();
 });
 </script>
 
@@ -141,18 +248,21 @@ onMounted(() => {
   <div class="transfer-page">
     <h2 class="page-title">转会市场</h2>
     
-    <!-- 资金显示 -->
     <div class="funds-bar">
       <div class="funds-item">
         <span class="funds-label">可用资金</span>
         <span class="funds-value">{{ currentFunds }}万</span>
       </div>
-      <div class="transfer-status" :class="{ open: isTransferWindow }">
-        {{ isTransferWindow ? '转会期开放' : '转会期关闭' }}
+      <div class="window-info">
+        <div class="transfer-status" :class="{ open: isTransferWindow }">
+          {{ windowStatus }}
+        </div>
+        <div v-if="isTransferWindow && daysRemaining > 0" class="days-remaining">
+          剩余 {{ daysRemaining }} 天
+        </div>
       </div>
     </div>
     
-    <!-- 位置筛选 -->
     <div class="filter-bar">
       <button 
         v-for="(name, key) in positionNames" 
@@ -165,7 +275,6 @@ onMounted(() => {
       </button>
     </div>
     
-    <!-- 标签切换 -->
     <div class="tab-bar">
       <button 
         class="tab-btn" 
@@ -173,6 +282,22 @@ onMounted(() => {
         @click="activeTab = 'market'"
       >
         转会市场
+      </button>
+      <button 
+        class="tab-btn" 
+        :class="{ active: activeTab === 'bidding' }"
+        @click="activeTab = 'bidding'"
+      >
+        竞价
+        <span v-if="pendingBidsCount > 0" class="badge">{{ pendingBidsCount }}</span>
+      </button>
+      <button 
+        class="tab-btn" 
+        :class="{ active: activeTab === 'negotiations' }"
+        @click="activeTab = 'negotiations'"
+      >
+        谈判
+        <span v-if="activeNegotiationsCount > 0" class="badge">{{ activeNegotiationsCount }}</span>
       </button>
       <button 
         class="tab-btn" 
@@ -190,7 +315,6 @@ onMounted(() => {
       </button>
     </div>
     
-    <!-- 转会市场 -->
     <div v-if="activeTab === 'market'" class="player-list">
       <div class="action-bar">
         <button class="refresh-btn" @click="refreshMarket">
@@ -218,10 +342,10 @@ onMounted(() => {
             <div class="stat-bar">
               <div 
                 class="stat-fill" 
-                :style="{ width: (player as any).getTotalPower?.() + '%' }"
+                :style="{ width: getPlayerPower(player) + '%' }"
               ></div>
             </div>
-            <span class="stat-value">{{ (player as any).getTotalPower?.() || 0 }}</span>
+            <span class="stat-value">{{ getPlayerPower(player) }}</span>
           </div>
           <div class="stat-row">
             <span class="stat-label">潜力</span>
@@ -248,7 +372,107 @@ onMounted(() => {
       </div>
     </div>
     
-    <!-- 自由选手 -->
+    <div v-else-if="activeTab === 'bidding'" class="bidding-section">
+      <div class="section-header">
+        <h3>我的竞价</h3>
+        <span class="count-badge">{{ myBids.length }} 个</span>
+      </div>
+      
+      <div v-if="myBids.length > 0" class="bids-list">
+        <div 
+          v-for="bid in myBids" 
+          :key="bid.id"
+          class="bid-card"
+          :class="{ leading: bid.leadingClubId === currentClubId }"
+        >
+          <div class="bid-header">
+            <div class="player-info">
+              <span class="player-name">{{ bid.playerName }}</span>
+              <span class="position-tag" :class="bid.position">{{ bid.position }}</span>
+            </div>
+            <span 
+              class="bid-status"
+              :class="bid.leadingClubId === currentClubId ? 'leading' : 'outbid'"
+            >
+              {{ bid.leadingClubId === currentClubId ? '领先' : '落后' }}
+            </span>
+          </div>
+          <div class="bid-details">
+            <div class="detail-item">
+              <span class="label">当前最高价</span>
+              <span class="value highlight">{{ bid.highestBid }} 万</span>
+            </div>
+            <div class="detail-item">
+              <span class="label">违约金</span>
+              <span class="value">{{ bid.buyoutClause }} 万</span>
+            </div>
+            <div class="detail-item">
+              <span class="label">截止时间</span>
+              <span class="value">{{ new Date(bid.deadline).toLocaleDateString() }}</span>
+            </div>
+          </div>
+          <div class="bid-actions">
+            <button 
+              class="action-btn primary"
+              @click="openBiddingPanel({ id: bid.playerId, name: bid.playerName, position: bid.position, buyoutClause: bid.buyoutClause, currentClubId: bid.currentClubId, currentClubName: bid.currentClubName })"
+            >
+              继续出价
+            </button>
+          </div>
+        </div>
+      </div>
+      
+      <div v-else class="empty-state">
+        <p>暂无竞价记录</p>
+        <p class="hint">在转会市场选择选手进行竞价</p>
+      </div>
+    </div>
+    
+    <div v-else-if="activeTab === 'negotiations'" class="negotiations-section">
+      <div class="section-header">
+        <h3>转会谈判</h3>
+        <span class="count-badge">{{ myNegotiations.length }} 个</span>
+      </div>
+      
+      <div v-if="myNegotiations.length > 0" class="negotiations-list">
+        <div 
+          v-for="negotiation in myNegotiations" 
+          :key="negotiation.id"
+          class="negotiation-card"
+          :class="getNegotiationStatusClass(negotiation.status)"
+          @click="openNegotiationPanel(negotiation)"
+        >
+          <div class="negotiation-header">
+            <div class="player-info">
+              <span class="player-name">{{ negotiation.playerName }}</span>
+              <span class="position-tag" :class="negotiation.position">{{ negotiation.position }}</span>
+            </div>
+            <span class="negotiation-status" :class="getNegotiationStatusClass(negotiation.status)">
+              {{ getNegotiationStatusText(negotiation.status) }}
+            </span>
+          </div>
+          <div class="negotiation-details">
+            <div class="clubs-info">
+              <span class="club">{{ negotiation.buyingClubName }}</span>
+              <span class="arrow">→</span>
+              <span class="club">{{ negotiation.sellingClubName }}</span>
+            </div>
+            <div class="round-info">
+              第 {{ negotiation.rounds.length + 1 }} 轮谈判
+            </div>
+          </div>
+          <div v-if="negotiation.agreement" class="agreement-preview">
+            已达成: {{ negotiation.agreement.fee }} 万
+          </div>
+        </div>
+      </div>
+      
+      <div v-else class="empty-state">
+        <p>暂无谈判记录</p>
+        <p class="hint">对其他俱乐部的选手发起转会谈判</p>
+      </div>
+    </div>
+    
     <div v-else-if="activeTab === 'free'" class="player-list">
       <div 
         v-for="player in freePlayers" 
@@ -270,10 +494,10 @@ onMounted(() => {
             <div class="stat-bar">
               <div 
                 class="stat-fill" 
-                :style="{ width: (player as any).getTotalPower?.() + '%' }"
+                :style="{ width: getPlayerPower(player) + '%' }"
               ></div>
             </div>
-            <span class="stat-value">{{ (player as any).getTotalPower?.() || 0 }}</span>
+            <span class="stat-value">{{ getPlayerPower(player) }}</span>
           </div>
         </div>
         
@@ -288,7 +512,6 @@ onMounted(() => {
       </div>
     </div>
     
-    <!-- 青训 -->
     <div v-else class="youth-section">
       <div class="youth-info">
         <h3>青训系统</h3>
@@ -309,7 +532,6 @@ onMounted(() => {
       </button>
     </div>
     
-    <!-- 选手详情弹窗 -->
     <div v-if="showPlayerDetail && selectedPlayer" class="modal-overlay" @click="closePlayerDetail">
       <div class="modal-content" @click.stop>
         <div class="modal-header">
@@ -318,7 +540,6 @@ onMounted(() => {
         </div>
         
         <div class="modal-body">
-          <!-- 基本信息 -->
           <div class="info-section">
             <div class="info-row">
               <span class="info-label">位置</span>
@@ -334,11 +555,10 @@ onMounted(() => {
             </div>
             <div class="info-row">
               <span class="info-label">总实力</span>
-              <span class="info-value highlight">{{ (selectedPlayer as any).getTotalPower?.() || 0 }}</span>
+              <span class="info-value highlight">{{ getPlayerPower(selectedPlayer) }}</span>
             </div>
           </div>
           
-          <!-- 属性详情 -->
           <div class="stats-section">
             <h4>属性详情</h4>
             <div 
@@ -354,7 +574,6 @@ onMounted(() => {
             </div>
           </div>
           
-          <!-- 合同信息 -->
           <div class="contract-section">
             <h4>合同信息</h4>
             <div class="info-row">
@@ -373,16 +592,51 @@ onMounted(() => {
         </div>
         
         <div class="modal-footer">
-          <button 
-            class="sign-btn"
-            :disabled="!isTransferWindow || currentFunds < selectedPlayer.contract.buyoutClause"
-            @click="signPlayer(selectedPlayer)"
-          >
-            <span v-if="!isTransferWindow">转会期关闭</span>
-            <span v-else-if="currentFunds < selectedPlayer.contract.buyoutClause">资金不足</span>
-            <span v-else>签约选手</span>
-          </button>
+          <div class="action-buttons">
+            <button 
+              v-if="activeTab === 'market'"
+              class="action-btn bidding"
+              :disabled="!isTransferWindow"
+              @click="openBiddingPanel(selectedPlayer)"
+            >
+              竞价出价
+            </button>
+            <button 
+              class="action-btn sign"
+              :disabled="!isTransferWindow || currentFunds < selectedPlayer.contract.buyoutClause"
+              @click="signPlayer(selectedPlayer)"
+            >
+              <span v-if="!isTransferWindow">转会期关闭</span>
+              <span v-else-if="currentFunds < selectedPlayer.contract.buyoutClause">资金不足</span>
+              <span v-else>直接签约</span>
+            </button>
+          </div>
         </div>
+      </div>
+    </div>
+    
+    <div v-if="showBiddingPanel && selectedPlayer" class="modal-overlay" @click="closeBiddingPanel">
+      <div class="modal-content bidding-modal" @click.stop>
+        <TransferBidding
+          :playerId="selectedPlayer.id"
+          :playerName="selectedPlayer.name"
+          :position="selectedPlayer.position"
+          :buyoutClause="selectedPlayer.contract.buyoutClause"
+          :currentClubId="selectedPlayer.currentClubId || ''"
+          :currentClubName="selectedPlayer.currentClubName || ''"
+          @close="closeBiddingPanel"
+          @success="onBiddingSuccess"
+        />
+      </div>
+    </div>
+    
+    <div v-if="showNegotiationPanel && selectedNegotiation" class="modal-overlay" @click="closeNegotiationPanel">
+      <div class="modal-content negotiation-modal" @click.stop>
+        <TransferNegotiationPanel
+          :negotiation="selectedNegotiation"
+          @close="closeNegotiationPanel"
+          @completed="onNegotiationCompleted"
+        />
       </div>
     </div>
   </div>
@@ -401,7 +655,6 @@ onMounted(() => {
   color: #333;
 }
 
-/* 资金栏 */
 .funds-bar {
   display: flex;
   justify-content: space-between;
@@ -429,6 +682,13 @@ onMounted(() => {
   color: #28a745;
 }
 
+.window-info {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
 .transfer-status {
   padding: 6px 12px;
   border-radius: 20px;
@@ -443,7 +703,11 @@ onMounted(() => {
   color: #155724;
 }
 
-/* 筛选栏 */
+.days-remaining {
+  font-size: 11px;
+  color: #666;
+}
+
 .filter-bar {
   display: flex;
   gap: 8px;
@@ -470,23 +734,26 @@ onMounted(() => {
   border-color: #007bff;
 }
 
-/* 标签栏 */
 .tab-bar {
   display: flex;
-  gap: 10px;
+  gap: 8px;
   margin-bottom: 15px;
+  overflow-x: auto;
+  padding-bottom: 5px;
 }
 
 .tab-btn {
   flex: 1;
-  padding: 12px;
+  min-width: 60px;
+  padding: 10px 8px;
   border: none;
   border-radius: 8px;
   background: #f5f5f5;
   color: #666;
-  font-size: 14px;
+  font-size: 13px;
   cursor: pointer;
   transition: all 0.3s ease;
+  position: relative;
 }
 
 .tab-btn.active {
@@ -494,7 +761,22 @@ onMounted(() => {
   color: white;
 }
 
-/* 选手列表 */
+.badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  background: #dc3545;
+  color: white;
+  border-radius: 9px;
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .player-list {
   display: flex;
   flex-direction: column;
@@ -566,7 +848,6 @@ onMounted(() => {
   color: #999;
 }
 
-/* 属性条 */
 .player-stats {
   margin-bottom: 12px;
 }
@@ -611,7 +892,6 @@ onMounted(() => {
   color: #333;
 }
 
-/* 底部信息 */
 .player-footer {
   display: flex;
   justify-content: space-between;
@@ -640,7 +920,199 @@ onMounted(() => {
   font-weight: bold;
 }
 
-/* 青训区域 */
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 15px;
+}
+
+.section-header h3 {
+  margin: 0;
+  font-size: 16px;
+  color: #333;
+}
+
+.count-badge {
+  padding: 2px 8px;
+  background: #e9ecef;
+  border-radius: 10px;
+  font-size: 12px;
+  color: #666;
+}
+
+.bids-list,
+.negotiations-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.bid-card,
+.negotiation-card {
+  background: white;
+  border-radius: 12px;
+  padding: 15px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border-left: 3px solid #ddd;
+}
+
+.bid-card.leading {
+  border-left-color: #28a745;
+}
+
+.bid-card:active,
+.negotiation-card:active {
+  transform: scale(0.98);
+}
+
+.bid-header,
+.negotiation-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.bid-header .player-info,
+.negotiation-header .player-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.bid-header .player-name,
+.negotiation-header .player-name {
+  font-size: 16px;
+  font-weight: bold;
+}
+
+.position-tag {
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: bold;
+  color: white;
+}
+
+.position-tag.top { background: #e74c3c; }
+.position-tag.jungle { background: #27ae60; }
+.position-tag.mid { background: #3498db; }
+.position-tag.adc { background: #f39c12; }
+.position-tag.support { background: #9b59b6; }
+
+.bid-status {
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.bid-status.leading {
+  background: #d4edda;
+  color: #155724;
+}
+
+.bid-status.outbid {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+.negotiation-status {
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.negotiation-status.pending { background: #fff3cd; color: #856404; }
+.negotiation-status.in-progress { background: #cce5ff; color: #004085; }
+.negotiation-status.agreed { background: #d4edda; color: #155724; }
+.negotiation-status.rejected { background: #f8d7da; color: #721c24; }
+.negotiation-status.expired { background: #e2e3e5; color: #383d41; }
+
+.bid-details,
+.negotiation-details {
+  margin-bottom: 12px;
+}
+
+.detail-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 0;
+  font-size: 13px;
+}
+
+.detail-item .label {
+  color: #666;
+}
+
+.detail-item .value {
+  font-weight: 500;
+}
+
+.detail-item .value.highlight {
+  color: #007bff;
+  font-weight: bold;
+}
+
+.clubs-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+
+.clubs-info .club {
+  color: #333;
+}
+
+.clubs-info .arrow {
+  color: #999;
+}
+
+.round-info {
+  font-size: 12px;
+  color: #666;
+}
+
+.agreement-preview {
+  padding: 8px;
+  background: #d4edda;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #155724;
+  text-align: center;
+}
+
+.bid-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.action-btn {
+  flex: 1;
+  padding: 10px;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.action-btn.primary {
+  background: #007bff;
+  color: white;
+}
+
+.action-btn.primary:hover {
+  background: #0056b3;
+}
+
 .youth-section {
   background: white;
   border-radius: 12px;
@@ -725,14 +1197,17 @@ onMounted(() => {
   opacity: 0.9;
 }
 
-/* 空状态 */
 .empty-state {
   text-align: center;
   padding: 40px 20px;
   color: #999;
 }
 
-/* 弹窗 */
+.empty-state .hint {
+  font-size: 12px;
+  margin-top: 8px;
+}
+
 .modal-overlay {
   position: fixed;
   top: 0;
@@ -754,6 +1229,11 @@ onMounted(() => {
   max-width: 400px;
   max-height: 80vh;
   overflow-y: auto;
+}
+
+.modal-content.bidding-modal,
+.modal-content.negotiation-modal {
+  max-width: 450px;
 }
 
 .modal-header {
@@ -858,25 +1338,42 @@ onMounted(() => {
   border-top: 1px solid #eee;
 }
 
-.sign-btn {
-  width: 100%;
-  padding: 14px;
+.action-buttons {
+  display: flex;
+  gap: 10px;
+}
+
+.action-buttons .action-btn {
+  flex: 1;
+  padding: 12px;
   border: none;
   border-radius: 8px;
-  background: #28a745;
-  color: white;
-  font-size: 16px;
+  font-size: 14px;
   font-weight: bold;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all 0.2s;
 }
 
-.sign-btn:disabled {
+.action-buttons .action-btn.bidding {
+  background: #17a2b8;
+  color: white;
+}
+
+.action-buttons .action-btn.bidding:hover:not(:disabled) {
+  background: #138496;
+}
+
+.action-buttons .action-btn.sign {
+  background: #28a745;
+  color: white;
+}
+
+.action-buttons .action-btn.sign:hover:not(:disabled) {
+  background: #218838;
+}
+
+.action-buttons .action-btn:disabled {
   background: #ccc;
   cursor: not-allowed;
-}
-
-.sign-btn:not(:disabled):active {
-  background: #218838;
 }
 </style>

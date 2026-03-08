@@ -146,7 +146,9 @@ export const useMatchStore = defineStore('match', {
           homePlayer as any,
           awayPlayer as any,
           homeHero,
-          awayHero
+          awayHero,
+          match.homeTeam.clubId,
+          match.awayTeam.clubId
         );
         
         if (result.homeWin) {

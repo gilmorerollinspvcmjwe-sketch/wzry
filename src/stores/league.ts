@@ -1,17 +1,14 @@
-// 联赛系统 Store
-
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import type { LeagueSeason } from '@/types/league';
 import { LeagueService } from '@/core/services/leagueService';
 import { useClubStore } from './club';
+import { getClubTotalPower } from '@/utils/clubUtils';
 
 export const useLeagueStore = defineStore('league', () => {
-  // State
   const currentSeason = ref<LeagueSeason | null>(null);
   const isLoading = ref(false);
 
-  // Getters
   const standings = computed(() => currentSeason.value?.standings || []);
   const currentRound = computed(() => currentSeason.value?.currentRound || 0);
   const totalRounds = computed(() => currentSeason.value?.totalRounds || 0);
@@ -38,7 +35,6 @@ export const useLeagueStore = defineStore('league', () => {
     return standings.value.find(s => s.clubId === clubId) || null;
   });
 
-  // Actions
   function createNewSeason(year: number, season: 'spring' | 'summer') {
     const clubStore = useClubStore();
     const allClubs = clubStore.clubs;
@@ -47,9 +43,7 @@ export const useLeagueStore = defineStore('league', () => {
       throw new Error('需要至少2个俱乐部才能创建联赛');
     }
 
-    // 将普通对象转换为Club实例
-    const clubInstances = allClubs.map(c => c as any);
-    currentSeason.value = LeagueService.createSeason(year, season, clubInstances);
+    currentSeason.value = LeagueService.createSeason(year, season, allClubs);
   }
 
   function startSeason() {
@@ -78,11 +72,10 @@ export const useLeagueStore = defineStore('league', () => {
       winnerId
     );
 
-    // 发放奖励
     const clubStore = useClubStore();
     const winner = clubStore.getClub(winnerId);
     if (winner) {
-      (winner as any).addFunds?.(50); // 胜利奖励50万
+      clubStore.addFundsToClub(winnerId, 50);
     }
   }
 
@@ -92,11 +85,10 @@ export const useLeagueStore = defineStore('league', () => {
     const matches = currentRoundMatches.value.filter(m => !m.isFinished);
     
     matches.forEach(match => {
-      // 模拟比赛结果
       const homePower = getClubPower(match.homeTeamId);
       const awayPower = getClubPower(match.awayTeamId);
       
-      const homeAdvantage = 5; // 主场优势
+      const homeAdvantage = 5;
       const homeRoll = homePower + homeAdvantage + Math.random() * 20;
       const awayRoll = awayPower + Math.random() * 20;
       
@@ -107,31 +99,24 @@ export const useLeagueStore = defineStore('league', () => {
       updateMatchResult(match.id, homeScore, awayScore, winnerId);
     });
 
-    // 进入下一轮
     advanceToNextRound();
   }
 
   function getClubPower(clubId: string): number {
     const clubStore = useClubStore();
     const club = clubStore.getClub(clubId);
-    // 使用类型断言访问方法
-    return (club as any)?.getTotalPower?.() || 0;
+    return getClubTotalPower(club);
   }
 
   function finishSeason() {
     if (!currentSeason.value) return;
     
-    // 发放赛季奖励
     const clubStore = useClubStore();
     standings.value.forEach(standing => {
-      const club = clubStore.getClub(standing.clubId);
-      if (club) {
-        const reward = LeagueService.getLeagueRewards(standing.rank);
-        (club as any).addFunds?.(reward);
-      }
+      const reward = LeagueService.getLeagueRewards(standing.rank);
+      clubStore.addFundsToClub(standing.clubId, reward);
     });
 
-    // 进入休赛期
     currentSeason.value.phase = 'offseason';
   }
 

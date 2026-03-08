@@ -1506,6 +1506,235 @@ export const events: GameEvent[] = [
       },
     ]
   ),
+
+  // ==================== 媒体事件补充 (MEDIA) ====================
+  createEvent(
+    'media_006',
+    '粉丝见面会',
+    '俱乐部计划举办粉丝见面会，与粉丝近距离互动。',
+    EventCategory.MEDIA,
+    EventRarity.COMMON,
+    1.0,
+    { minFans: 3000 },
+    [
+      {
+        id: 'hold',
+        text: '举办见面会',
+        consequences: {
+          fundsChange: -20,
+          fanChange: 800,
+          reputationChange: 5,
+        },
+        preview: '花费 20 万，粉丝 +800，声望 +5',
+      },
+      {
+        id: 'online',
+        text: '线上互动',
+        consequences: {
+          fundsChange: -5,
+          fanChange: 300,
+        },
+        preview: '花费 5 万，粉丝 +300',
+      },
+    ]
+  ),
+
+  createEvent(
+    'media_007',
+    '选手综艺节目',
+    '某综艺节目邀请俱乐部选手参加录制。',
+    EventCategory.MEDIA,
+    EventRarity.UNCOMMON,
+    0.7,
+    { minReputation: 40 },
+    [
+      {
+        id: 'participate',
+        text: '派选手参加',
+        consequences: {
+          fundsChange: 30,
+          fanChange: 500,
+          staminaChange: -10,
+        },
+        preview: '获得 30 万，粉丝 +500，体力 -10',
+      },
+      {
+        id: 'decline',
+        text: '专注训练',
+        consequences: {
+          playerMoraleChange: -3,
+        },
+        preview: '选手士气 -3',
+      },
+    ]
+  ),
+
+  createEvent(
+    'media_008',
+    '电竞纪录片',
+    '知名导演计划拍摄电竞纪录片，希望俱乐部配合。',
+    EventCategory.MEDIA,
+    EventRarity.RARE,
+    0.4,
+    { minReputation: 60 },
+    [
+      {
+        id: 'cooperate',
+        text: '全力配合',
+        consequences: {
+          fundsChange: 50,
+          reputationChange: 15,
+          fanChange: 600,
+          staminaChange: -5,
+        },
+        preview: '获得 50 万，声望 +15，粉丝 +600，体力 -5',
+      },
+      {
+        id: 'limited',
+        text: '有限配合',
+        consequences: {
+          fundsChange: 20,
+          reputationChange: 5,
+        },
+        preview: '获得 20 万，声望 +5',
+      },
+    ]
+  ),
+
+  createEvent(
+    'media_009',
+    '媒体开放日',
+    '俱乐部举办媒体开放日，邀请多家媒体参观基地。',
+    EventCategory.MEDIA,
+    EventRarity.UNCOMMON,
+    0.6,
+    {},
+    [
+      {
+        id: 'grand',
+        text: '盛大举办',
+        consequences: {
+          fundsChange: -40,
+          reputationChange: 12,
+          fanChange: 400,
+        },
+        preview: '花费 40 万，声望 +12，粉丝 +400',
+      },
+      {
+        id: 'simple',
+        text: '简单举办',
+        consequences: {
+          fundsChange: -15,
+          reputationChange: 5,
+          fanChange: 150,
+        },
+        preview: '花费 15 万，声望 +5，粉丝 +150',
+      },
+    ]
+  ),
+
+  createEvent(
+    'media_010',
+    '选手直播活动',
+    '平台组织选手集体直播活动，增加曝光度。',
+    EventCategory.MEDIA,
+    EventRarity.COMMON,
+    1.0,
+    {},
+    [
+      {
+        id: 'active',
+        text: '积极参与',
+        consequences: {
+          fundsChange: 20,
+          fanChange: 400,
+          staminaChange: -5,
+        },
+        preview: '获得 20 万，粉丝 +400，体力 -5',
+      },
+      {
+        id: 'normal',
+        text: '正常参与',
+        consequences: {
+          fundsChange: 10,
+          fanChange: 200,
+        },
+        preview: '获得 10 万，粉丝 +200',
+      },
+    ]
+  ),
+
+  createEvent(
+    'media_011',
+    '负面舆论危机',
+    '网络上出现针对俱乐部的负面舆论，需要处理。',
+    EventCategory.MEDIA,
+    EventRarity.RARE,
+    0.3,
+    {},
+    [
+      {
+        id: 'respond_strong',
+        text: '强硬回应',
+        consequences: {
+          fundsChange: -30,
+          reputationChange: 5,
+          fanChange: 200,
+        },
+        preview: '花费 30 万公关，声望 +5，粉丝 +200',
+      },
+      {
+        id: 'apologize',
+        text: '道歉澄清',
+        consequences: {
+          fundsChange: -10,
+          reputationChange: -5,
+          fanChange: -100,
+        },
+        preview: '花费 10 万，声望 -5，粉丝 -100',
+      },
+      {
+        id: 'ignore',
+        text: '冷处理',
+        consequences: {
+          reputationChange: -10,
+          fanChange: -300,
+        },
+        preview: '声望 -10，粉丝 -300',
+      },
+    ]
+  ),
+
+  createEvent(
+    'media_012',
+    '明星选手采访',
+    '队内明星选手接受知名媒体专访。',
+    EventCategory.MEDIA,
+    EventRarity.UNCOMMON,
+    0.7,
+    { hasPlayer: 'star' },
+    [
+      {
+        id: 'promote',
+        text: '大力宣传',
+        consequences: {
+          fundsChange: -10,
+          fanChange: 500,
+          reputationChange: 8,
+        },
+        preview: '花费 10 万，粉丝 +500，声望 +8',
+      },
+      {
+        id: 'natural',
+        text: '自然传播',
+        consequences: {
+          fanChange: 200,
+          reputationChange: 3,
+        },
+        preview: '粉丝 +200，声望 +3',
+      },
+    ]
+  ),
 ];
 
 // 按类别筛选事件

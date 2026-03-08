@@ -3,6 +3,7 @@
 import type { Player } from '@/core/models/Player';
 import type { Hero } from '@/core/models/Hero';
 import type { HeroRole } from '@/types';
+import { calculateTacticalBonus, calculateBPBonusForClub } from '@/core/services/tacticsService';
 
 export interface PlayerHeroMatchResult {
   heroId: string;
@@ -19,6 +20,7 @@ export interface MatchResultFactors {
   personalityBonus: number;
   talentBonus: number;
   staminaFactor: number;
+  tacticalBonus: number;
   randomFactor: number;
   totalScore: number;
 }
@@ -99,7 +101,8 @@ export class MatchCalculationService {
   static calculateMatchResult(
     player: Player,
     hero: Hero,
-    _opponentPower: number = 70
+    _opponentPower: number = 70,
+    clubId?: string
   ): MatchResultFactors {
     // 1. 选手实力
     const playerPower = (player as any).getTotalPower?.() || player.getTotalPower();
@@ -109,9 +112,19 @@ export class MatchCalculationService {
     const heroFit = heroMatch.matchPercentage;
 
     // 3. BP优势（简化计算）
-    const bpAdvantage = 50 + Math.random() * 20 - 10;
+    let bpAdvantage = 50 + Math.random() * 20 - 10;
+    
+    // 4. 战术加成
+    let tacticalBonusValue = 0;
+    if (clubId) {
+      const bpBonus = calculateBPBonusForClub(clubId);
+      bpAdvantage += bpBonus * 100;
+      
+      const tacticalBonuses = calculateTacticalBonus(clubId);
+      tacticalBonusValue = Object.values(tacticalBonuses).reduce((sum, v) => sum + v, 0);
+    }
 
-    // 4. 性格加成
+    // 5. 性格加成
     let personalityBonus = 0;
     if (player.personality.playStyle === 'aggressive') {
       personalityBonus += 5;
@@ -125,7 +138,7 @@ export class MatchCalculationService {
       personalityBonus -= 5;
     }
 
-    // 5. 天赋加成
+    // 6. 天赋加成
     let talentBonus = 0;
     for (const talent of player.talents) {
       if (talent.effect.type === 'potential_bonus') {
@@ -135,10 +148,10 @@ export class MatchCalculationService {
       }
     }
 
-    // 6. 体力因素
+    // 7. 体力因素
     const staminaFactor = player.condition.stamina / 100;
 
-    // 7. 随机因素
+    // 8. 随机因素
     const randomFactor = Math.random() * 20;
 
     // 计算总分
@@ -149,6 +162,7 @@ export class MatchCalculationService {
       personalityBonus * 0.1 +
       talentBonus * 0.1 +
       staminaFactor * 10 +
+      tacticalBonusValue * 0.5 +
       randomFactor * 0.1
     );
 
@@ -159,6 +173,7 @@ export class MatchCalculationService {
       personalityBonus,
       talentBonus,
       staminaFactor,
+      tacticalBonus: tacticalBonusValue,
       randomFactor,
       totalScore: Math.round(totalScore * 10) / 10
     };
@@ -169,10 +184,12 @@ export class MatchCalculationService {
     homePlayer: Player,
     awayPlayer: Player,
     homeHero: Hero,
-    awayHero: Hero
+    awayHero: Hero,
+    homeClubId?: string,
+    awayClubId?: string
   ): { homeWin: boolean; homeScore: number; awayScore: number } {
-    const homeFactors = this.calculateMatchResult(homePlayer, homeHero);
-    const awayFactors = this.calculateMatchResult(awayPlayer, awayHero);
+    const homeFactors = this.calculateMatchResult(homePlayer, homeHero, 70, homeClubId);
+    const awayFactors = this.calculateMatchResult(awayPlayer, awayHero, 70, awayClubId);
 
     const homeScore = homeFactors.totalScore + Math.random() * 20;
     const awayScore = awayFactors.totalScore + Math.random() * 20;

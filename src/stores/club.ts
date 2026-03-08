@@ -2,10 +2,27 @@ import { defineStore } from 'pinia';
 import { Club } from '@/core/models/Club';
 import type { Player } from '@/core/models/Player';
 import type { Facilities } from '@/types';
+import { getClubTotalPower } from '@/utils/clubUtils';
 
 interface ClubState {
   currentClub: Club | null;
   clubs: Club[];
+}
+
+function calculateWeeklyIncome(club: Club | null): number {
+  if (!club) return 0;
+  const sponsorIncome = club.sponsorshipIncome || 0;
+  const merchandiseIncome = Math.floor((club.fans || 0) * 0.01);
+  const prizeIncome = club.prizeMoney || 0;
+  return sponsorIncome + merchandiseIncome + prizeIncome;
+}
+
+function calculateWeeklyExpense(club: Club | null): number {
+  if (!club) return 0;
+  const salaryExpense = club.roster?.reduce((sum, p) => sum + (p.contract?.salary || 0), 0) || 0;
+  const facilityExpense = club.facilities ? 
+    (club.facilities.training + club.facilities.medical + club.facilities.analysis + club.facilities.youth) * 5 : 0;
+  return salaryExpense + facilityExpense;
 }
 
 export const useClubStore = defineStore('club', {
@@ -15,32 +32,30 @@ export const useClubStore = defineStore('club', {
   }),
   
   getters: {
-    // 周收入
     weeklyIncome: (state) => {
-      if (!state.currentClub) return 0;
-      // 使用类型断言访问方法（Pinia持久化后方法会丢失）
-      return (state.currentClub as any).getWeeklyIncome?.() || 0;
+      return calculateWeeklyIncome(state.currentClub);
     },
     
-    // 周支出
     weeklyExpense: (state) => {
-      if (!state.currentClub) return 0;
-      // 使用类型断言访问方法（Pinia持久化后方法会丢失）
-      return (state.currentClub as any).getWeeklyExpense?.() || 0;
+      return calculateWeeklyExpense(state.currentClub);
     },
     
-    // 设施总等级
     totalFacilityLevel: (state) => {
       if (!state.currentClub) return 0;
       const f = state.currentClub.facilities;
       return f.training + f.medical + f.analysis + f.youth;
     },
     
-    // 获取修复后的 roster（Pinia 持久化后方法会丢失，需要修复）
     fixedRoster: (state) => {
       if (!state.currentClub) return [];
       return state.currentClub.roster.map((p: any) => ({
         ...p,
+        condition: {
+          stamina: p.condition?.stamina ?? 100,
+          mentality: p.condition?.mentality ?? 80,
+          injury: p.condition?.injury ?? 0,
+          morale: p.condition?.morale ?? 75,
+        },
         getTotalPower: () => {
           const stats = p.stats || {};
           const values = Object.values(stats) as number[];
@@ -54,6 +69,12 @@ export const useClubStore = defineStore('club', {
       if (!state.currentClub) return [];
       return (state.currentClub.youthTeam || []).map((p: any) => ({
         ...p,
+        condition: {
+          stamina: p.condition?.stamina ?? 100,
+          mentality: p.condition?.mentality ?? 80,
+          injury: p.condition?.injury ?? 0,
+          morale: p.condition?.morale ?? 75,
+        },
         getTotalPower: () => {
           const stats = p.stats || {};
           const values = Object.values(stats) as number[];
@@ -99,16 +120,99 @@ export const useClubStore = defineStore('club', {
     },
     
     // 签约选手
-    signPlayer(player: Player, isYouth: boolean = false): boolean {
-      if (!this.currentClub) return false;
+    signPlayer(player: Player, isYouth: boolean = false): { success: boolean; message?: string; competingClubs?: string[] } {
+      if (!this.currentClub) return { success: false };
       
-      // 检查资金
-      if (!this.spendFunds(player.contract.buyoutClause)) {
-        return false;
+      const { transferService } = require('@/core/services/transferService');
+      const { AIService } = require('@/core/services/aiService');
+      
+      const playerMarketPrice = player.contract.buyoutClause;
+      let finalPrice = playerMarketPrice;
+      const competingClubs: string[] = [];
+      let biddingWar = false;
+      
+      const marketOffer = transferService.getTransferMarket().find(offer => offer.playerId === player.id && offer.status === 'active');
+      
+      if (marketOffer) {
+        const aiClubs = this.clubs.filter(c => c.id !== this.currentClub?.id);
+        
+        aiClubs.forEach(club => {
+          const aiProfile = AIService.getAIProfile(club.id);
+          if (!aiProfile) return;
+          
+          const needScore = AIService.evaluatePositionNeed(club, player.position, aiProfile);
+          const playerValue = AIService.evaluatePlayerValue(player, aiProfile);
+          const maxBudget = club.funds * (aiProfile.personality.riskTolerance / 100);
+          
+          if (needScore > 50 && playerValue >= playerMarketPrice * 0.8 && maxBudget >= playerMarketPrice) {
+            competingClubs.push(club.name);
+            
+            if (aiProfile.personality.aggressiveness > 60) {
+              const aiBid = playerMarketPrice * (1 + Math.random() * 0.2);
+              if (aiBid > finalPrice) {
+                finalPrice = aiBid;
+                biddingWar = true;
+              }
+            }
+          }
+        });
+        
+        if (marketOffer.highestBid > 0) {
+          finalPrice = Math.max(finalPrice, marketOffer.highestBid * 1.1);
+          biddingWar = true;
+        }
+      } else {
+        const aiClubs = this.clubs.filter(c => c.id !== this.currentClub?.id);
+        
+        aiClubs.forEach(club => {
+          const aiProfile = AIService.getAIProfile(club.id);
+          if (!aiProfile) return;
+          
+          const needScore = AIService.evaluatePositionNeed(club, player.position, aiProfile);
+          const playerValue = AIService.evaluatePlayerValue(player, aiProfile);
+          const maxBudget = club.funds * (aiProfile.personality.riskTolerance / 100);
+          
+          if (needScore > 70 && playerValue >= playerMarketPrice * 0.9 && maxBudget >= playerMarketPrice * 0.9) {
+            if (Math.random() < aiProfile.personality.aggressiveness / 100) {
+              competingClubs.push(club.name);
+              
+              const aiBid = playerMarketPrice * (0.95 + Math.random() * 0.15);
+              if (aiBid > finalPrice) {
+                finalPrice = aiBid;
+                biddingWar = true;
+              }
+            }
+          }
+        });
+      }
+      
+      if (finalPrice > playerMarketPrice) {
+        finalPrice = Math.ceil(finalPrice);
+      }
+      
+      if (!this.spendFunds(finalPrice)) {
+        return { 
+          success: false, 
+          message: `资金不足！需要 ${finalPrice}万，但俱乐部只有 ${this.currentClub.funds}万`,
+          competingClubs: competingClubs.length > 0 ? competingClubs : undefined
+        };
       }
       
       this.currentClub.addPlayer(player, isYouth);
-      return true;
+      
+      let message = `成功签约 ${player.name}！`;
+      if (biddingWar) {
+        message += ` 经过激烈竞价，最终以 ${finalPrice}万成交！`;
+      }
+      if (competingClubs.length > 0) {
+        message += ` 参与竞价的俱乐部：${competingClubs.join('、')}`;
+      }
+      
+      return { 
+        success: true, 
+        message,
+        competingClubs: competingClubs.length > 0 ? competingClubs : undefined
+      };
     },
     
     // 解约选手
@@ -156,6 +260,14 @@ export const useClubStore = defineStore('club', {
     updateFunds(amount: number) {
       if (!this.currentClub) return;
       this.currentClub.funds += amount;
+    },
+    
+    // 给指定俱乐部添加资金
+    addFundsToClub(clubId: string, amount: number) {
+      const club = this.clubs.find(c => c.id === clubId);
+      if (club) {
+        club.funds += amount;
+      }
     },
     
     // 更新薪资（用于事件后果）
