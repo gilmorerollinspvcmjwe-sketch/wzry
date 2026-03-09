@@ -16,12 +16,11 @@ import type { Position, PlayerStats } from '@/types';
 import { useClubStore } from '@/stores/club';
 import { useYouthAcademyStore } from '@/stores/youthAcademy';
 import { usePlayerStore } from '@/stores/player';
+// 复用 playerGenerator 的名字生成逻辑
+import { generatePlayer as generateFullPlayer } from './playerGenerator';
 
 const COACH_SURNAMES = ['张', '李', '王', '刘', '陈', '杨', '赵', '周', '吴', '郑', '孙', '马', '朱', '胡', '林', '何', '郭', '徐', '高', '梁', '谢', '韩', '唐', '冯'];
 const COACH_GIVEN_NAMES = ['伟', '明', '强', '洋', '杰', '帆', '磊', '涛', '昊', '宇', '浩', '超', '俊', '斌', '峰', '勇', '威', '军', '远', '冰', '亮', '刚', '辉', '鹏'];
-
-const PLAYER_SURNAMES = ['张', '李', '王', '刘', '陈', '杨', '赵', '周', '吴', '郑', '孙', '马', '朱', '胡', '林', '何', '郭', '徐', '高', '梁'];
-const PLAYER_GIVEN_NAMES = ['明', '强', '洋', '杰', '帆', '磊', '涛', '昊', '宇', '浩', '超', '俊', '斌', '峰', '勇', '威', '军', '远', '冰', '亮'];
 
 function generateId(prefix: string = 'id'): string {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -42,11 +41,13 @@ function generateCoachName(): string {
   return surname + givenName + (Math.random() > 0.5 ? givenName2 : '');
 }
 
+/**
+ * 生成青训选手名字 - 复用 playerGenerator 的名字库
+ */
 function generatePlayerName(): string {
-  const surname = randomItem(PLAYER_SURNAMES);
-  const givenName = randomItem(PLAYER_GIVEN_NAMES);
-  const givenName2 = randomItem(PLAYER_GIVEN_NAMES);
-  return surname + givenName + (Math.random() > 0.5 ? givenName2 : '');
+  // 使用 playerGenerator 生成一个完整选手，只取其名字
+  const player = generateFullPlayer({ age: 17 });
+  return player.name;
 }
 
 export function initializeAcademy(clubId: string): YouthAcademy {

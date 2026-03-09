@@ -2,8 +2,10 @@ import { defineStore } from 'pinia';
 import { Match } from '@/core/models/Match';
 import type { MatchPlayer, MatchStats } from '@/types';
 import { MatchCalculationService } from '@/core/services/matchCalculationService';
+import { matchCallbackService } from '@/core/services/matchCallbackService';
 import { useHeroStore } from '@/stores/hero';
 import { useClubStore } from '@/stores/club';
+import { useGameStore } from '@/stores/game';
 
 interface MatchState {
   currentMatch: Match | null;
@@ -201,7 +203,35 @@ export const useMatchStore = defineStore('match', {
       this.clearSelection('home');
       this.clearSelection('away');
       
+      // 触发比赛结果回调
+      this.triggerMatchCallbacks(match, winner === 'home');
+      
       return { winner, homeScore, awayScore };
+    },
+    
+    // 触发比赛结果回调
+    triggerMatchCallbacks(match: Match, playerWon: boolean): void {
+      const clubStore = useClubStore();
+      const gameStore = useGameStore();
+      
+      const playerClubId = clubStore.club?.id || '';
+      const isPlayerMatch = match.homeTeam.clubId === playerClubId || match.awayTeam.clubId === playerClubId;
+      
+      const context = {
+        isPlayerMatch,
+        playerWon: isPlayerMatch && playerWon,
+        playerClubId,
+        week: gameStore.week,
+        season: gameStore.season,
+      };
+      
+      // 触发各类回调
+      matchCallbackService.trigger('match_end', match, context);
+      matchCallbackService.trigger('player_performance', match, context);
+      matchCallbackService.trigger('achievement_check', match, context);
+      matchCallbackService.trigger('objective_update', match, context);
+      matchCallbackService.trigger('media_update', match, context);
+      matchCallbackService.trigger('statistics_update', match, context);
     },
     
     // 记录英雄使用统计

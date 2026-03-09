@@ -93,8 +93,11 @@
             <button class="promote-btn">提拔</button>
           </div>
         </div>
-        <button class="scout-btn" @click="scoutYouth">
+        <button v-if="youthPlayers.length === 0" class="scout-btn" @click="scoutYouth">
           ⛏️ 挖掘新选手
+        </button>
+        <button v-else class="scout-btn" @click="goToYouth">
+          查看青训学院
         </button>
       </div>
     </div>
@@ -106,12 +109,15 @@ import { ref, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { useClubStore } from '@/stores/club';
 import { usePlayerStore } from '@/stores/player';
+import { useYouthAcademyStore } from '@/stores/youthAcademy';
+import { recruitYouthPlayer } from '@/core/services/youthAcademyService';
 import { RouteNames } from '@/constants/routes';
 import { getPlayerTotalPower } from '@/utils/playerUtils';
 
 const router = useRouter();
 const clubStore = useClubStore();
 const playerStore = usePlayerStore();
+const youthAcademyStore = useYouthAcademyStore();
 
 const tabs = [
   { key: 'roster', label: '阵容' },
@@ -135,8 +141,10 @@ const recommendedPlayers = ref([
   { id: '3', name: '王明星', price: 500, reason: '明星选手' },
 ]);
 
+const clubId = computed(() => clubStore.currentClub?.id || '');
+
 const youthPlayers = computed(() => {
-  return playerStore.youthPlayers.slice(0, 3);
+  return youthAcademyStore.getAvailablePlayers(clubId.value).slice(0, 3);
 });
 
 const getPlayerPower = (player: any): number => {
@@ -156,14 +164,20 @@ const goToTransfer = () => {
   router.push('/game/transfer');
 };
 
+const goToYouth = () => {
+  router.push('/youth');
+};
+
 const promoteYouth = (player: any) => {
   console.log('提拔:', player);
 };
 
 const scoutYouth = () => {
-  const player = playerStore.generateYouthPlayer();
-  if (player) {
-    alert(`发现青训选手：${player.name}，潜力${player.potential}`);
+  const result = recruitYouthPlayer(clubId.value);
+  if (result.success && result.player) {
+    alert(`发现青训选手：${result.player.name}，潜力${result.player.potential}`);
+  } else {
+    alert(result.message || '招募失败');
   }
 };
 </script>

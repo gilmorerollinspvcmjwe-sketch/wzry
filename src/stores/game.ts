@@ -7,7 +7,12 @@ import { useFanReputationStore } from './fanReputation';
 import { useEventStore } from './event';
 import { useMediaStore } from './media';
 import { useAIStore } from './ai';
+import { useLeagueStore } from './league';
+import { useTransferWindowStore } from './transferWindow';
+import { useRetirementStore } from './retirement';
 import { AIService } from '@/core/services/aiService';
+import { analystService } from '@/core/services/analystService';
+import { useTournamentStore } from './tournament';
 
 interface GameSettings {
   difficulty: Difficulty;
@@ -27,7 +32,6 @@ interface GameStateInterface {
   weeklyReport: WeeklyReport | null;
 }
 
-// 周报数据
 interface WeeklyReport {
   week: number;
   fanChange: number;
@@ -57,7 +61,6 @@ export const useGameStore = defineStore('game', {
   }),
   
   getters: {
-    // 当前阶段
     currentPhase: (state) => {
       const date = state.currentDate instanceof Date ? state.currentDate : new Date(state.currentDate);
       const month = date.getMonth();
@@ -68,7 +71,6 @@ export const useGameStore = defineStore('game', {
       return 'worlds';
     },
     
-    // 是否为转会期
     isTransferWindow: (state) => {
       const date = state.currentDate instanceof Date ? state.currentDate : new Date(state.currentDate);
       const month = date.getMonth();
@@ -77,7 +79,6 @@ export const useGameStore = defineStore('game', {
   },
   
   actions: {
-    // 开始新游戏
     newGame(_clubName: string, difficulty: Difficulty = 'normal') {
       this.gameState = 'playing';
       this.currentDate = new Date(2024, 0, 1);
@@ -88,35 +89,24 @@ export const useGameStore = defineStore('game', {
       this.achievements = [];
       this.weeklyReport = null;
 
-      // 初始化各子系统
       this.initializeSystems();
     },
 
-    // 初始化各系统
     initializeSystems() {
       const sponsorStore = useSponsorStore();
       const fanReputationStore = useFanReputationStore();
       const mediaStore = useMediaStore();
 
-      // 初始化英雄系统 - 简化版无需初始化
-
-      // 初始化赞助商系统
       sponsorStore.initialize();
-
-      // 初始化粉丝声望系统
       fanReputationStore.initialize(10000, 30);
-
-      // 初始化媒体系统
       mediaStore.initialize();
     },
     
-    // 推进时间
     advanceTime(days: number = 1) {
-      // 确保 currentDate 是 Date 对象（Pinia 持久化后会变成字符串）
       const currentDateObj = this.currentDate instanceof Date 
         ? this.currentDate 
         : new Date(this.currentDate);
-      
+       
       for (let i = 0; i < days; i++) {
         currentDateObj.setDate(currentDateObj.getDate() + 1);
         this.currentDate = new Date(currentDateObj);
@@ -124,52 +114,41 @@ export const useGameStore = defineStore('game', {
       }
     },
     
-    // 每日事件
     onDayPassed() {
-      // 确保 currentDate 是 Date 对象
       const currentDateObj = this.currentDate instanceof Date 
         ? this.currentDate 
         : new Date(this.currentDate);
-      
-      // 检查随机事件
+       
       this.checkRandomEvents();
-      
-      // 每周一更新
+       
       if (currentDateObj.getDay() === 1) {
         this.onWeekPassed();
       }
     },
     
-    // 检查随机事件（集成事件系统）
     checkRandomEvents() {
       const eventStore = useEventStore();
       const clubStore = useClubStore();
       const club = clubStore.currentClub;
-      
+       
       if (!club) return;
-      
-      // 创建俱乐部状态对象用于事件触发
+       
       const clubState = {
         funds: club.funds,
         reputation: club.reputation,
         fans: club.fans,
         week: this.currentWeek,
-        ranking: 10, // TODO: 从联赛排名获取
-        winRate: 0.5, // TODO: 从比赛记录获取
+        ranking: 10,
+        winRate: 0.5,
         seasonPhase: 'regular' as const,
         playerCount: club.roster.length,
-        hasPlayer: (_playerType: string) => {
-          // TODO: 实现选手类型检查
-          return false;
-        },
+        hasPlayer: (_playerType: string) => false,
       };
-      
-      // 触发每日事件
+       
       const currentDay = Math.floor((this.currentDate.getTime() - new Date(2024, 0, 1).getTime()) / (1000 * 60 * 60 * 24));
       eventStore.triggerDailyEvent(currentDay, clubState);
     },
     
-    // 每周事件
     onWeekPassed() {
       this.currentWeek++;
 
@@ -178,15 +157,13 @@ export const useGameStore = defineStore('game', {
       const sponsorStore = useSponsorStore();
       const fanReputationStore = useFanReputationStore();
       const mediaStore = useMediaStore();
+      const leagueStore = useLeagueStore();
 
-      // 获取当前俱乐部数据
       const club = clubStore.currentClub;
       if (!club) return;
 
-      // 1. AI 俱乐部周模拟
       this.simulateAIClubs();
 
-      // 2. 处理赞助商周结算
       const currentRanking = 10;
       const winRate = 0.5;
 
@@ -197,12 +174,10 @@ export const useGameStore = defineStore('game', {
         club.fans
       );
 
-      // 添加赞助收入
       if (sponsorResult.income > 0) {
         clubStore.addFunds(sponsorResult.income + sponsorResult.bonus);
       }
 
-      // 3. 处理粉丝与声望周增长
       const fanResult = fanReputationStore.processWeeklyGrowth(
         this.currentWeek,
         currentRanking,
@@ -210,25 +185,34 @@ export const useGameStore = defineStore('game', {
         sponsorStore.hasSponsor
       );
 
-      // 添加粉丝收入
       const fanIncome = fanReputationStore.weeklyFanIncome;
       clubStore.addFunds(fanIncome);
 
-      // 同步粉丝和声望到俱乐部
       club.fans = fanReputationStore.totalFans;
       club.reputation = fanReputationStore.reputation;
 
-      // 4. 媒体系统周更新
       mediaStore.onWeekAdvance();
 
-      // 5. 检查版本更新 - 简化版暂不实现
-
-      // 6. 选手恢复体力
       club.roster.forEach(player => {
         playerStore.recoverPlayer(player.id);
       });
 
-      // 7. 生成周报
+      this.simulateAITransferBidding();
+
+      const retirementStore = useRetirementStore();
+      club.roster.forEach(player => {
+        const canRetire = retirementStore.checkRetirementEligibility(player.id);
+        if (canRetire.eligible) {
+          retirementStore.triggerRetirementEvent(player.id, club.id);
+        }
+      });
+
+      analystService.clearExpiredReports();
+
+      if (leagueStore.currentSeason?.phase === 'regular') {
+        leagueStore.simulateAllMatchesInRound();
+      }
+
       this.weeklyReport = {
         week: this.currentWeek,
         fanChange: fanResult.fanChange,
@@ -239,32 +223,24 @@ export const useGameStore = defineStore('game', {
         totalIncome: sponsorResult.income + sponsorResult.bonus + fanIncome,
         message: sponsorResult.message,
       };
-
-      console.log('Week passed:', this.currentWeek, 'Report:', this.weeklyReport);
     },
     
-    // AI 俱乐部周模拟
     simulateAIClubs() {
       const clubStore = useClubStore();
       const playerStore = usePlayerStore();
       const aiStore = useAIStore();
 
-      // 获取所有 AI 俱乐部（排除玩家俱乐部）
       const allClubs = clubStore.allClubs;
       const playerClubId = clubStore.currentClub?.id;
 
       if (!playerClubId) return;
 
-      // 获取所有可用选手（自由球员 + 青训）
       const availablePlayers = playerStore.availablePlayers;
 
-      // 遍历所有 AI 俱乐部
       allClubs.forEach(club => {
-        if (club.id === playerClubId) return; // 跳过玩家俱乐部
+        if (club.id === playerClubId) return;
 
-        // 初始化 AI 配置（如果还没有）
         if (!AIService.getAIProfile(club.id)) {
-          // 优先从 store 恢复
           const storedProfile = aiStore.getAIProfile(club.id);
           if (storedProfile && storedProfile.template) {
             AIService.initAIClub(club.id, storedProfile.template);
@@ -273,13 +249,11 @@ export const useGameStore = defineStore('game', {
           }
         }
 
-        // 执行 AI 周模拟（使用类型断言处理 Pinia 持久化后的对象）
         const clubWithMethods = club as any;
         if (clubWithMethods.roster) {
           AIService.simulateAIWeek(clubWithMethods, availablePlayers);
         }
 
-        // 更新 AI Profile 到 store（持久化）
         const updatedProfile = AIService.getAIProfile(club.id);
         if (updatedProfile) {
           aiStore.setAIProfile(club.id, updatedProfile);
@@ -287,9 +261,43 @@ export const useGameStore = defineStore('game', {
       });
     },
     
-    // 检查随机事件已在上面定义
+    simulateAITransferBidding() {
+      const clubStore = useClubStore();
+      const playerStore = usePlayerStore();
+      const transferWindowStore = useTransferWindowStore();
+      
+      const allClubs = clubStore.allClubs;
+      const playerClubId = clubStore.currentClub?.id;
+      
+      if (!playerClubId) return;
+      
+      const transferOffers = transferWindowStore.activeOffers;
+      
+      allClubs.forEach(club => {
+        if (club.id === playerClubId) return;
+        
+        const clubWithMethods = club as any;
+        const clubFunds = clubWithMethods.funds || 0;
+        const clubPower = clubWithMethods.roster?.reduce((sum: number, p: any) => sum + (p.power || 50), 0) || 0;
+        
+        transferOffers.forEach(offer => {
+          if (offer.status !== 'active') return;
+          
+          const player = playerStore.getPlayer(offer.playerId);
+          if (!player) return;
+          
+          const playerPower = player.power || 50;
+          const buyout = offer.buyoutClause || player.contract?.buyoutClause || 100;
+          
+          if (clubFunds > buyout * 1.5 && clubPower < 300) {
+            const bidAmount = buyout * (0.8 + Math.random() * 0.4);
+            
+            transferWindowStore.placeBid(offer.playerId, club.id, bidAmount, 'open');
+          }
+        });
+      });
+    },
     
-    // 保存游戏
     saveGame(): string {
       const saveData = {
         game: this.$state,
@@ -299,7 +307,6 @@ export const useGameStore = defineStore('game', {
       return saveId;
     },
     
-    // 加载游戏
     loadGame(saveId: string) {
       const saveData = JSON.parse(localStorage.getItem(saveId) || '{}');
       if (saveData.game) {

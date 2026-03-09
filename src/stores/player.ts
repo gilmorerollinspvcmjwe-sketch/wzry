@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 import { PlayerClass } from '@/core/models/Player';
 import type { Position } from '@/types';
+import { generatePlayer as generatePlayerService, generateYouthPlayer as generateYouthPlayerService } from '@/core/services/playerGenerator';
 
 // 使用PlayerClass类型
 interface PlayerState {
@@ -34,23 +35,18 @@ export const usePlayerStore = defineStore('player', {
   },
   
   actions: {
-    // 生成随机选手
+    // 生成随机选手 - 复用 playerGenerator 服务
     generatePlayer(ageRange: [number, number], potentialRange: [number, number]): PlayerClass {
-      const age = ageRange[0] + Math.floor(Math.random() * (ageRange[1] - ageRange[0] + 1));
-      const potential = potentialRange[0] + Math.floor(Math.random() * (potentialRange[1] - potentialRange[0] + 1));
-      const positions: Position[] = ['top', 'jungle', 'mid', 'adc', 'support'];
-      const position = positions[Math.floor(Math.random() * positions.length)]!;
-      const names = ['选手 A', '选手 B', '选手 C', '选手 D', '选手 E'];
-      const name = names[Math.floor(Math.random() * names.length)]! + Math.floor(Math.random() * 100);
-      
-      return new PlayerClass(name, age, position, potential);
+      const player = generatePlayerService({
+        age: ageRange[0] + Math.floor(Math.random() * (ageRange[1] - ageRange[0] + 1)),
+        potential: potentialRange[0] + Math.floor(Math.random() * (potentialRange[1] - potentialRange[0] + 1)),
+      });
+      return player as PlayerClass;
     },
     
-    // 生成青训选手
+    // 生成青训选手 - 复用 playerGenerator 服务
     generateYouthPlayer(): PlayerClass {
-      const player = this.generatePlayer([16, 18], [60, 95]);
-      player.contract.salary = 5;
-      return player;
+      return generateYouthPlayerService() as PlayerClass;
     },
     
     // 更新选手状态

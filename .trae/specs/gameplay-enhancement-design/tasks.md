@@ -1,197 +1,322 @@
-# Tasks
+# 游戏可玩性增强 - 任务清单
 
-## 第一阶段：核心系统增强（高优先级）
+## 阶段一：核心循环打通（P0 - 最高优先级）
 
-- [x] Task 1: 教练团队系统
-  - [x] Task 1.1: 创建教练类型定义 `src/types/coach.ts`
-  - [x] Task 1.2: 创建教练服务 `src/core/services/coachService.ts`
-  - [x] Task 1.3: 创建教练状态管理 `src/stores/coach.ts`
-  - [x] Task 1.4: 创建教练团队页面 `src/views/coach/index.vue`
-  - [x] Task 1.5: 创建聘请教练页面 `src/views/coach/hiring.vue`
-  - [x] Task 1.6: 创建教练会议页面 `src/views/coach/meeting.vue`
-  - [x] Task 1.7: 集成教练系统到比赛流程
+### 1.1 比赛结果数据更新机制
 
-- [x] Task 2: 选手个性化系统
-  - [x] Task 2.1: 创建选手个性化类型定义 `src/types/playerPersonality.ts`
-  - [x] Task 2.2: 创建选手个性化服务 `src/core/services/playerPersonalityService.ts`
-  - [x] Task 2.3: 创建选手个性化状态管理 `src/stores/playerPersonality.ts`
-  - [x] Task 2.4: 创建选手对话组件 `src/components/PlayerDialogue.vue`
-  - [x] Task 2.5: 创建选手诉求组件 `src/components/PlayerDemands.vue`
-  - [x] Task 2.6: 创建选手情绪显示组件 `src/components/PlayerEmotion.vue`
-  - [x] Task 2.7: 集成到选手详情页
+- [x] 1.1.1 创建比赛结果回调钩子系统 (matchCallbackSystem.ts)
+  - [x] 定义回调接口类型
+  - [x] 创建回调注册/触发机制
+  - [x] 集成到MatchService
 
-- [x] Task 3: 战术深度系统
-  - [x] Task 3.1: 创建战术类型定义 `src/types/tactics.ts`
-  - [x] Task 3.2: 创建战术服务 `src/core/services/tacticsService.ts`
-  - [x] Task 3.3: 创建战术状态管理 `src/stores/tactics.ts`
-  - [x] Task 3.4: 创建战术中心页面 `src/views/tactics/index.vue`
-  - [x] Task 3.5: 创建阵容体系页面 `src/views/tactics/formation.vue`
-  - [x] Task 3.6: 创建BP策略页面 `src/views/tactics/bp.vue`
-  - [x] Task 3.7: 集成战术系统到比赛流程
+- [x] 1.1.2 实现选手数据更新逻辑
+  - [x] 比赛结束后增加选手经验值
+  - [x] 更新击杀/助攻/死亡统计
+  - [x] 更新英雄使用次数
+  - [x] 更新选手状态（疲劳度变化）
 
-- [x] Task 4: 目标系统
-  - [x] Task 4.1: 创建目标类型定义 `src/types/objective.ts`
-  - [x] Task 4.2: 创建目标服务 `src/core/services/objectiveService.ts`
-  - [x] Task 4.3: 创建目标状态管理 `src/stores/objective.ts`
-  - [x] Task 4.4: 创建目标中心页面 `src/views/objective/index.vue`
-  - [x] Task 4.5: 创建赛季目标页面 `src/views/objective/season.vue`
-  - [x] Task 4.6: 创建里程碑页面 `src/views/objective/milestones.vue`
-  - [x] Task 4.7: 集成目标系统到游戏流程
+- [x] 1.1.3 成就系统联动
+  - [x] achievementService添加updateProgress方法
+  - [x] 实现first_win成就检测
+  - [x] 实现wins相关成就检测
+  - [x] 实现championship成就检测
 
-## 第二阶段：玩法丰富（中优先级）
+- [x] 1.1.4 赛季目标系统联动
+  - [x] seasonObjectiveService添加updateProgress方法
+  - [x] 实现胜场数进度更新
+  - [x] 实现排名进度更新
 
-- [x] Task 5: 青训学院系统
-  - [x] Task 5.1: 创建青训类型定义 `src/types/youthAcademy.ts`
-  - [x] Task 5.2: 创建青训服务 `src/core/services/youthAcademyService.ts`
-  - [x] Task 5.3: 创建青训状态管理 `src/stores/youthAcademy.ts`
-  - [x] Task 5.4: 创建青训学院页面 `src/views/youth/index.vue`
-  - [x] Task 5.5: 创建青训教练页面 `src/views/youth/coaches.vue`
-  - [x] Task 5.6: 创建青训设施页面 `src/views/youth/facilities.vue`
-  - [x] Task 5.7: 创建青训联赛页面 `src/views/youth/league.vue`
+- [x] 1.1.5 媒体系统联动
+  - [x] 创建赛后新闻生成服务
+  - [x] 实现采访触发机制
+  - [x] 更新媒体关系值
 
-- [x] Task 6: 主场系统
-  - [x] Task 6.1: 创建主场类型定义 `src/types/homeVenue.ts`
-  - [x] Task 6.2: 创建主场服务 `src/core/services/homeVenueService.ts`
-  - [x] Task 6.3: 创建主场状态管理 `src/stores/homeVenue.ts`
-  - [x] Task 6.4: 创建主场管理页面 `src/views/venue/index.vue`
-  - [x] Task 6.5: 创建主场建设页面 `src/views/venue/construction.vue`
-  - [x] Task 6.6: 创建主场商业页面 `src/views/venue/commercial.vue`
+### 1.2 时间推进与事件触发
 
-- [x] Task 7: 经济系统扩展
-  - [x] Task 7.1: 扩展财务类型定义 `src/types/finance.ts`
-  - [x] Task 7.2: 创建财务服务 `src/core/services/financeService.ts`
-  - [x] Task 7.3: 扩展财务状态管理 `src/stores/finance.ts`
-  - [x] Task 7.4: 创建财务中心页面 `src/views/finance/index.vue`
-  - [x] Task 7.5: 创建财务报表页面 `src/views/finance/report.vue`
-  - [x] Task 7.6: 创建投资管理页面 `src/views/finance/investment.vue`
+- [x] 1.2.1 重构GameStore时间推进
+  - [x] 修改advanceTime方法
+  - [x] 添加周末判定逻辑
+  - [x] 添加赛季进度计算
 
-- [x] Task 8: 转会窗口系统
-  - [x] Task 8.1: 创建转会窗口类型定义 `src/types/transferWindow.ts`
-  - [x] Task 8.2: 创建转会窗口服务 `src/core/services/transferWindowService.ts`
-  - [x] Task 8.3: 创建转会窗口状态管理 `src/stores/transferWindow.ts`
-  - [x] Task 8.4: 创建竞价系统组件 `src/components/TransferBidding.vue`
-  - [x] Task 8.5: 创建谈判系统组件 `src/components/TransferNegotiation.vue`
-  - [x] Task 8.6: 集成到转会市场页面
+- [x] 1.2.2 创建事件触发服务
+  - [x] eventTriggerService.ts
+  - [x] 实现随机事件选择算法
+  - [x] 定义事件触发概率
 
-- [x] Task 9: 版本适应系统
-  - [x] Task 9.1: 创建版本类型定义 `src/types/version.ts`
-  - [x] Task 9.2: 创建版本服务 `src/core/services/versionService.ts`
-  - [x] Task 9.3: 创建版本状态管理 `src/stores/version.ts`
-  - [x] Task 9.4: 创建版本更新通知组件 `src/components/VersionUpdate.vue`
-  - [x] Task 9.5: 创建版本研究组件 `src/components/VersionResearch.vue`
+- [x] 1.2.3 随机事件库完善
+  - [x] 选手伤病事件
+  - [x] 训练意外事件
+  - [x] 商业机会事件
+  - [x] 媒体采访事件
+  - [x] 粉丝活动事件
 
-## 第三阶段：锦上添花（低优先级）
+- [x] 1.2.4 赛季阶段管理
+  - [x] 常规赛阶段（16周）
+  - [x] 季后赛阶段（4周）
+  - [x] 休赛期阶段
 
-- [x] Task 10: 比赛可视化系统
-  - [x] Task 10.1: 创建比赛可视化类型定义 `src/types/matchVisualization.ts`
-  - [x] Task 10.2: 创建比赛可视化服务 `src/core/services/matchVisualizationService.ts`
-  - [x] Task 10.3: 创建小地图组件 `src/components/MatchMinimap.vue`
-  - [x] Task 10.4: 创建经济曲线组件 `src/components/GoldCurve.vue`
-  - [x] Task 10.5: 创建数据面板组件 `src/components/MatchDataPanel.vue`
-  - [x] Task 10.6: 创建赛后分析组件 `src/components/PostMatchAnalysis.vue`
-  - [x] Task 10.7: 集成到比赛页面
+---
 
-- [x] Task 11: AI个性系统
-  - [x] Task 11.1: 创建AI个性类型定义 `src/types/aiPersonality.ts`
-  - [x] Task 11.2: 创建AI个性服务 `src/core/services/aiPersonalityService.ts`
-  - [x] Task 11.3: 创建AI个性状态管理 `src/stores/aiPersonality.ts`
-  - [x] Task 11.4: 集成AI个性到转会决策
-  - [x] Task 11.5: 集成AI个性到比赛战术
+## 阶段二：AI联赛模拟（P0 - 最高优先级）
 
-- [x] Task 12: 选手生涯故事系统
-  - [x] Task 12.1: 创建故事线类型定义 `src/types/storyline.ts`
-  - [x] Task 12.2: 创建故事线服务 `src/core/services/storylineService.ts`
-  - [x] Task 12.3: 创建故事线状态管理 `src/stores/storyline.ts`
-  - [x] Task 12.4: 创建故事线页面 `src/views/player/storyline.vue`
-  - [x] Task 12.5: 创建故事事件组件 `src/components/StoryEvent.vue`
+### 2.1 AI俱乐部比赛模拟
 
-- [x] Task 13: 选手关系网络系统
-  - [x] Task 13.1: 创建关系网络类型定义 `src/types/relationship.ts`
-  - [x] Task 13.2: 创建关系网络服务 `src/core/services/relationshipService.ts`
-  - [x] Task 13.3: 创建关系网络状态管理 `src/stores/relationship.ts`
-  - [x] Task 13.4: 创建关系网络可视化组件 `src/components/RelationshipNetwork.vue`
-  - [x] Task 13.5: 创建团队化学反应组件 `src/components/TeamChemistry.vue`
+- [x] 2.1.1 创建AI比赛模拟服务
+  - [x] aiMatchSimulator.ts
+  - [x] 实现俱乐部实力评估
+  - [x] 实现比赛结果计算
+  - [x] 添加随机因素
 
-- [x] Task 14: 商业活动系统
-  - [x] Task 14.1: 创建商业活动类型定义 `src/types/commercial.ts`
-  - [x] Task 14.2: 创建商业活动服务 `src/core/services/commercialService.ts`
-  - [x] Task 14.3: 创建商业活动状态管理 `src/stores/commercial.ts`
-  - [x] Task 14.4: 创建商业活动页面 `src/views/player/commercial.vue`
-  - [x] Task 14.5: 创建代言管理组件 `src/components/EndorsementManager.vue`
+- [x] 2.1.2 集成到游戏循环
+  - [x] 在时间推进时调用模拟服务
+  - [x] 处理玩家vs AI的比赛结果
+  - [x] 处理AI vs AI的比赛结果
 
-- [x] Task 15: 退役传承系统
-  - [x] Task 15.1: 创建退役传承类型定义 `src/types/retirement.ts`
-  - [x] Task 15.2: 创建退役传承服务 `src/core/services/retirementService.ts`
-  - [x] Task 15.3: 创建退役传承状态管理 `src/stores/retirement.ts`
-  - [x] Task 15.4: 创建退役决策组件 `src/components/RetirementDecision.vue`
-  - [x] Task 15.5: 创建名人堂组件 `src/components/HallOfFame.vue`
+- [x] 2.1.3 数据更新处理
+  - [x] 更新AI俱乐部积分
+  - [x] 更新AI选手数据
+  - [x] 记录AI比赛统计
 
-- [x] Task 16: 联赛生态系统
-  - [x] Task 16.1: 创建联赛生态类型定义 `src/types/leagueEcosystem.ts`
-  - [x] Task 16.2: 创建联赛生态服务 `src/core/services/leagueEcosystemService.ts`
-  - [x] Task 16.3: 创建联赛生态状态管理 `src/stores/leagueEcosystem.ts`
-  - [x] Task 16.4: 创建赛事日历组件 `src/components/EventCalendar.vue`
-  - [x] Task 16.5: 创建积分榜组件 `src/components/LeagueStandings.vue`
+### 2.2 联赛赛程与积分榜
 
-- [x] Task 17: 粉丝社区系统
-  - [x] Task 17.1: 创建粉丝社区类型定义 `src/types/fanCommunity.ts`
-  - [x] Task 17.2: 创建粉丝社区服务 `src/core/services/fanCommunityService.ts`
-  - [x] Task 17.3: 创建粉丝社区状态管理 `src/stores/fanCommunity.ts`
-  - [x] Task 17.4: 创建粉丝社区页面 `src/views/community/index.vue`
-  - [x] Task 17.5: 创建粉丝活动页面 `src/views/community/activities.vue`
-  - [x] Task 17.6: 创建危机公关页面 `src/views/community/crisis.vue`
+- [x] 2.2.1 完善常规赛赛制
+  - [x] 10支队伍双循环赛程生成
+  - [x] 16周赛程安排
+  - [x] 主客场轮换
 
-## 第四阶段：UI集成与优化
+- [x] 2.2.2 完善季后赛赛制
+  - [x] 前8名季后赛资格
+  - [x] 单败淘汰赛程
+  - [x] 冠军产生逻辑
 
-- [x] Task 18: 导航与路由更新
-  - [x] Task 18.1: 更新路由配置添加新页面
-  - [x] Task 18.2: 更新侧边栏导航菜单
-  - [x] Task 18.3: 添加快捷入口组件
+- [x] 2.2.3 积分榜实时更新
+  - [x] 胜+3分计算
+  - [x] 净胜分计算
+  - [x] 实时排名更新
 
-- [x] Task 19: 选手详情页增强
-  - [x] Task 19.1: 添加对话标签页
-  - [x] Task 19.2: 添加关系标签页
-  - [x] Task 19.3: 添加故事标签页
-  - [x] Task 19.4: 添加商业标签页
+- [x] 2.2.4 联赛页面优化
+  - [x] 显示当前轮次
+  - [x] 显示下场比赛
+  - [x] 显示夺冠概率
 
-- [x] Task 20: 比赛页面增强
-  - [x] Task 20.1: 集成小地图显示
-  - [x] Task 20.2: 集成经济曲线图
-  - [x] Task 20.3: 集成数据面板
-  - [x] Task 20.4: 集成赛后分析
+---
 
-- [x] Task 21: 俱乐部管理页面增强
-  - [x] Task 21.1: 添加主场管理入口
-  - [x] Task 21.2: 添加教练团队入口
-  - [x] Task 21.3: 添加财务详情入口
-  - [x] Task 21.4: 添加粉丝社区入口
+## 阶段三：数据持久化完善（P1）
 
-- [x] Task 22: 转会市场页面增强
-  - [x] Task 22.1: 添加转会窗口状态显示
-  - [x] Task 22.2: 集成竞价系统
-  - [x] Task 22.3: 集成谈判系统
+### 3.1 Store持久化配置
 
-# Task Dependencies
+- [x] 3.1.1 审计现有Store
+  - [x] 检查所有stores/*.ts的persist配置
+  - [x] 列出缺失配置的Store
+  - [x] 评估持久化需求
 
-- Task 2 (选手个性化系统) 依赖 Task 13 (选手关系网络系统) 的类型定义
-- Task 3 (战术深度系统) 依赖 Task 1 (教练团队系统)
-- Task 5 (青训学院系统) 依赖 Task 1 (教练团队系统)
-- Task 7 (经济系统扩展) 依赖 Task 6 (主场系统)
-- Task 8 (转会窗口系统) 依赖 Task 11 (AI个性系统)
-- Task 9 (版本适应系统) 依赖 Task 3 (战术深度系统)
-- Task 10 (比赛可视化系统) 依赖 Task 3 (战术深度系统)
-- Task 12 (选手生涯故事系统) 依赖 Task 2 (选手个性化系统)
-- Task 14 (商业活动系统) 依赖 Task 6 (主场系统)
-- Task 15 (退役传承系统) 依赖 Task 12 (选手生涯故事系统)
-- Task 16 (联赛生态系统) 独立
-- Task 17 (粉丝社区系统) 独立
-- Task 18-22 (UI集成) 依赖所有前置功能模块
+- [x] 3.1.2 补全league.ts持久化
+  - [x] 添加persist配置
+  - [x] 指定key名称
+  - [x] 测试刷新后数据
 
-# Parallel Execution Groups
+- [x] 3.1.3 补全game.ts持久化
+  - [x] 添加persist配置
+  - [x] 同步测试
 
-可并行执行的任务组：
-- Group A: Task 1, Task 4, Task 11, Task 16, Task 17 (独立任务)
-- Group B: Task 2, Task 3, Task 6 (依赖Group A)
-- Group C: Task 5, Task 7, Task 8, Task 9, Task 10, Task 13 (依赖Group B)
-- Group D: Task 12, Task 14, Task 15 (依赖Group C)
-- Group E: Task 18, Task 19, Task 20, Task 21, Task 22 (依赖所有前置任务)
+- [x] 3.1.4 补全youthAcademy.ts持久化
+  - [x] 添加persist配置
+  - [x] 同步测试
+
+- [x] 3.1.5 补全ai.ts持久化
+  - [x] 添加persist配置
+  - [x] 同步测试
+
+### 3.2 存档管理功能
+
+- [x] 3.2.1 创建存档管理Store
+  - [x] 定义存档数据结构
+  - [x] 实现存档列表管理
+  - [x] 实现存档删除
+
+- [x] 3.2.2 手动保存功能
+  - [x] 保存到localStorage
+  - [x] 保存时间戳记录
+  - [x] 覆盖确认
+
+- [x] 3.2.3 存档导出功能
+  - [x] JSON序列化
+  - [x] 文件下载
+
+- [x] 3.2.4 存档导入功能
+  - [x] JSON解析验证
+  - [x] 数据导入覆盖
+
+- [x] 3.2.5 存档管理页面
+  - [x] 创建saveLoad.vue
+  - [x] 存档列表展示
+  - [x] 操作按钮
+
+---
+
+## 阶段四：关键功能完善（P1）
+
+### 4.1 转会竞价系统
+
+- [x] 4.1.1 竞价触发机制
+  - [x] 热门球员判定
+  - [x] 竞价开始通知
+  - [x] 竞价时间限制
+
+- [x] 4.1.2 AI竞价逻辑
+  - [x] 俱乐部需求分析
+  - [x] 报价策略
+  - [x] 竞价响应
+
+- [x] 4.1.3 玩家竞价UI
+  - [x] 竞价面板组件
+  - [x] 当前报价显示
+  - [x] 出价/退出按钮
+
+- [x] 4.1.4 转会完成处理
+  - [x] 球员归属更新
+  - [x] 资金扣除
+  - [x] 媒体新闻生成
+
+### 4.2 球探报告系统
+
+- [x] 4.2.1 球探服务创建
+  - [x] scoutService.ts
+  - [x] 球探等级定义
+  - [x] 准确度计算
+
+- [x] 4.2.2 报告生成
+  - [x] 属性估计（含误差）
+  - [x] 潜力估计
+  - [x] 球员评价
+
+- [x] 4.2.3 球探UI
+  - [x] 搜索球员功能
+  - [x] 报告查看面板
+  - [x] 费用显示
+
+### 4.3 选手退役系统
+
+- [x] 4.3.1 退役触发检测
+  - [x] 年龄检测（28+）
+  - [x] 概率计算
+  - [x] 赛季检测
+
+- [x] 4.3.2 退役事件处理
+  - [x] 退役决策弹窗
+  - [x] 仪式选择
+  - [x] 奖励发放
+
+- [x] 4.3.3 名人堂系统
+  - [x] 退役选手记录
+  - [x] 展示页面
+
+---
+
+## 阶段五：UI/UX优化（P2）
+
+### 5.1 交互功能修复
+
+- [x] 5.1.1 按钮事件审计
+  - [x] 搜索所有@click
+  - [x] 识别无效绑定
+
+- [x] 5.1.2 方法补全
+  - [x] 补全handle方法
+  - [x] 添加loading状态
+  - [x] 添加结果提示
+
+- [x] 5.1.3 Toast提示组件
+  - [x] 成功提示
+  - [x] 错误提示
+  - [x] 加载提示
+
+### 5.2 页面导航修复
+
+- [x] 5.2.1 路由审计
+  - [x] 检查所有路由配置
+  - [x] 识别404问题
+
+- [x] 5.2.2 路由修复
+  - [x] 补全缺失路由
+  - [x] 重定向处理
+
+- [x] 5.2.3 导航菜单修复
+  - [x] 确认入口存在
+  - [x] 链接正确
+
+### 5.3 视觉风格统一
+
+- [x] 5.3.1 主题色定义
+  - [x] 创建theme.ts
+  - [x] 主色/辅色/警告色
+
+- [x] 5.3.2 组件样式统一
+  - [x] 按钮样式
+  - [x] 卡片样式
+  - [x] 输入框样式
+
+---
+
+## 阶段六：Bug修复与清理（P2）
+
+### 6.1 TypeScript错误修复
+
+- [x] 6.1.1 运行类型检查
+  - [x] npm run typecheck
+  - [x] 记录所有错误
+
+- [x] 6.1.2 错误修复
+  - [x] 类型注解添加
+  - [x] 接口实现补全
+  - [x] 类型断言修正
+
+### 6.2 代码清理
+
+- [x] 6.2.1 TODO处理
+  - [x] 搜索所有TODO
+  - [x] 评估优先级
+  - [x] 逐个处理
+
+- [x] 6.2.2 日志清理
+  - [x] 搜索console.log
+  - [x] 移除调试代码
+
+---
+
+## 任务依赖关系
+
+```
+阶段一（核心循环）:
+  1.1.1 → 1.1.2 → 1.1.3 → 1.1.4 → 1.1.5
+  1.2.1 → 1.2.2 → 1.2.3 → 1.2.4
+
+阶段二（AI联赛）:
+  2.1.1 → 2.1.2 → 2.1.3
+  2.2.1 → 2.2.2 → 2.2.3 → 2.2.4
+
+阶段三（持久化）:
+  3.1.1 → 3.1.2 → 3.1.3 → 3.1.4 → 3.1.5
+  3.2.1 → 3.2.2 → 3.2.3 → 3.2.4 → 3.2.5
+
+阶段四（关键功能）:
+  4.1.1 → 4.1.2 → 4.1.3 → 4.1.4
+  4.2.1 → 4.2.2 → 4.2.3
+  4.3.1 → 4.3.2 → 4.3.3
+
+阶段五（UI优化）:
+  5.1.1 → 5.1.2 → 5.1.3
+  5.2.1 → 5.2.2 → 5.2.3
+  5.3.1 → 5.3.2
+
+阶段六（Bug清理）:
+  6.1.1 → 6.1.2
+  6.2.1 → 6.2.2
+```
+
+## 并行任务
+
+以下任务可以并行执行：
+- 阶段一中的1.1.x任务可以并行
+- 阶段三中的3.1.x任务可以并行
+- 阶段五和阶段六可以与主流程并行
